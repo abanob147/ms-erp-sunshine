@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MS ERP | Sunshine Import & Export</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--navy:#142b4a;--blue:#2363a5;--bg:#f3f6fa;--line:#dce4ee;--text:#172334}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,Tahoma,sans-serif;background:var(--bg);color:var(--text)}
+header{background:var(--navy);color:white;padding:18px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+header h1{font-size:20px;margin:0}header small{opacity:.8}.wrap{max-width:1150px;margin:24px auto;padding:0 16px}
+.panel{background:white;border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px;box-shadow:0 4px 16px #18385a0a}
+.login{max-width:430px;margin:8vh auto}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+label{display:block;font-size:13px;margin:8px 0 5px;color:#42536a}input,select{width:100%;padding:11px;border:1px solid #cbd6e2;border-radius:8px;font:inherit;background:white}
+button{border:0;border-radius:8px;padding:11px 16px;background:var(--blue);color:white;font:inherit;cursor:pointer;margin-top:12px}
+button.secondary{background:#64748b}button.danger{background:#a33}button:disabled{opacity:.5}
+nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}nav button{margin:0;background:#dfe9f4;color:var(--navy)}nav button.active{background:var(--blue);color:white}
+.hidden{display:none!important}.muted{color:#63748a;font-size:13px}.error{color:#a11}.success{color:#176b42}
+table{width:100%;border-collapse:collapse;min-width:700px}th,td{padding:11px;border-bottom:1px solid var(--line);text-align:right;font-size:14px}th{background:#f5f8fb}
+.table-wrap{overflow:auto}.section-title{margin:0 0 14px;font-size:18px}.status{padding:10px;border-radius:8px;background:#eef4fb;margin-top:12px}
+@media(max-width:600px){header{align-items:flex-start}.wrap{margin:14px auto}.panel{padding:14px}}
+</style></head>
+<body>
+<header><div><h1>MS ERP</h1><small>Sunshine Import & Export</small></div><div id="userbar" class="hidden"><span id="useremail"></span> <button class="secondary" onclick="logout()">تسجيل الخروج</button></div></header>
+<div class="wrap">
+<section id="setup" class="panel">
+<h2 class="section-title">إعداد الاتصال لأول مرة</h2>
+<p>أدخل بيانات مشروع Supabase من إعدادات المشروع. لا تشارك هذه البيانات أو مفاتيح الخدمة السرية مع أي شخص.</p>
+<div class="grid"><div><label>Project URL</label><input id="sburl" placeholder="https://xxxx.supabase.co"></div><div><label>Publishable / anon key</label><input id="sbkey" placeholder="مفتاح النشر العام فقط"></div></div>
+<button onclick="saveConfig()">حفظ الاتصال على هذا الجهاز</button><p class="muted">يمكن تغيير البيانات لاحقًا من هذا الجهاز. لا تضع service_role key هنا مطلقًا.</p>
+</section>
+<section id="login" class="panel login hidden">
+<h2 class="section-title">تسجيل دخول المدير</h2>
+<label>البريد الإلكتروني</label><input id="email" type="email" value="Abanoubemel147@gmail.com">
+<label>كلمة المرور</label><input id="password" type="password" autocomplete="current-password">
+<button onclick="login()">دخول</button><p id="loginmsg" class="muted"></p>
+</section>
+<section id="app" class="hidden">
+<div class="panel"><div class="grid"><div><strong>النظام</strong><div class="muted">نسخة تجريبية متصلة بقاعدة بيانات</div></div><div><strong>المخزن</strong><div class="muted">مخزن واحد</div></div><div><strong>العملة الأساسية</strong><div class="muted">EGP — بدون ضريبة قيمة مضافة</div></div></div></div>
+<nav><button class="active" data-tab="shipments" onclick="tab('shipments',this)">الشحنات المستوردة</button><button data-tab="items" onclick="tab('items',this)">الأصناف والمخزون</button></nav>
+<div id="shipments" class="panel">
+<h2 class="section-title">إضافة شحنة استيراد</h2>
+<div class="grid">
+<div><label>اسم / وصف الشحنة</label><input id="sname"></div>
+<div><label>تاريخ الوصول المتوقع</label><input id="arrival" type="date"></div>
+<div><label>رقم الحاوية</label><input id="container"></div>
+<div><label>رقم بوليصة الشحن (B/L)</label><input id="bl"></div>
+<div><label>قيمة الفاتورة</label><input id="invoice" type="number" min="0" step="0.01"></div>
+<div><label>عملة الفاتورة</label><select id="currency"><option>USD</option><option>CNY</option><option>EGP</option></select></div>
+<div><label>إجمالي التكلفة بعد الجمارك (جنيه)</label><input id="landed" type="number" min="0" step="0.01"></div>
+</div><button onclick="addShipment()">حفظ الشحنة</button><p id="shipmsg" class="muted"></p>
+<h3>سجل الشحنات</h3><div class="table-wrap"><table><thead><tr><th>الشحنة</th><th>الوصول المتوقع</th><th>الحاوية</th><th>بوليصة الشحن</th><th>الفاتورة</th><th>التكلفة النهائية EGP</th></tr></thead><tbody id="shiprows"></tbody></table></div>
+</div>
+<div id="items" class="panel hidden">
+<h2 class="section-title">الأصناف والمخزون</h2>
+<div class="grid"><div><label>اسم الصنف</label><input id="iname"></div><div><label>كود الصنف</label><input id="icode"></div><div><label>وحدة القياس</label><input id="unit" placeholder="قطعة / كرتونة / كيلو"></div><div><label>الرصيد الافتتاحي</label><input id="qty" type="number" min="0" value="0"></div></div>
+<button onclick="addItem()">إضافة الصنف</button><p id="itemmsg" class="muted"></p>
+<div class="table-wrap"><table><thead><tr><th>الكود</th><th>الصنف</th><th>الوحدة</th><th>الرصيد</th></tr></thead><tbody id="itemrows"></tbody></table></div>
+</div>
+</section>
+</div>
+<script>
+let sb=null;
+function el(id){return document.getElementById(id)}
+function saveConfig(){const url=el('sburl').value.trim(),key=el('sbkey').value.trim();if(!url||!key){alert('أدخل رابط المشروع ومفتاح النشر العام');return}localStorage.setItem('ms_sb_url',url);localStorage.setItem('ms_sb_key',key);connect()}
+function connect(){const url=localStorage.getItem('ms_sb_url'),key=localStorage.getItem('ms_sb_key');if(!url||!key)return;sb=window.supabase.createClient(url,key);el('setup').classList.add('hidden');el('login').classList.remove('hidden');sb.auth.getSession().then(({data})=>{if(data.session)showApp()})}
+async function login(){el('loginmsg').textContent='جارٍ تسجيل الدخول...';const {error}=await sb.auth.signInWithPassword({email:el('email').value.trim(),password:el('password').value});if(error){el('loginmsg').textContent=error.message;return}showApp()}
+async function logout(){await sb.auth.signOut();el('app').classList.add('hidden');el('userbar').classList.add('hidden');el('login').classList.remove('hidden')}
+async function showApp(){const {data:{user}}=await sb.auth.getUser();el('useremail').textContent=user.email;el('userbar').classList.remove('hidden');el('login').classList.add('hidden');el('app').classList.remove('hidden');loadShipments();loadItems()}
+function tab(id,btn){document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');el('shipments').classList.toggle('hidden',id!=='shipments');el('items').classList.toggle('hidden',id!=='items')}
+async function addShipment(){const row={name:el('sname').value.trim(),expected_arrival:el('arrival').value||null,container_number:el('container').value.trim(),bl_number:el('bl').value.trim(),invoice_value:Number(el('invoice').value||0),invoice_currency:el('currency').value,landed_cost_egp:Number(el('landed').value||0)};if(!row.name){el('shipmsg').textContent='اكتب اسم الشحنة';return}const {error}=await sb.from('import_shipments').insert(row);el('shipmsg').textContent=error?error.message:'تم حفظ الشحنة بنجاح';el('shipmsg').className=error?'error':'success';if(!error){['sname','arrival','container','bl','invoice','landed'].forEach(x=>el(x).value='');loadShipments()}}
+async function loadShipments(){const {data,error}=await sb.from('import_shipments').select('*').order('created_at',{ascending:false});if(error){el('shiprows').innerHTML='<tr><td colspan="6">تعذر تحميل البيانات: '+error.message+'</td></tr>';return}el('shiprows').innerHTML=data.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.expected_arrival||''}</td><td>${esc(x.container_number||'')}</td><td>${esc(x.bl_number||'')}</td><td>${Number(x.invoice_value||0).toLocaleString()} ${x.invoice_currency}</td><td>${Number(x.landed_cost_egp||0).toLocaleString()}</td></tr>`).join('')}
+async function addItem(){const row={name:el('iname').value.trim(),sku:el('icode').value.trim(),unit:el('unit').value.trim(),opening_quantity:Number(el('qty').value||0)};if(!row.name){el('itemmsg').textContent='اكتب اسم الصنف';return}const {error}=await sb.from('items').insert(row);el('itemmsg').textContent=error?error.message:'تم إضافة الصنف';el('itemmsg').className=error?'error':'success';if(!error){['iname','icode','unit'].forEach(x=>el(x).value='');el('qty').value=0;loadItems()}}
+async function loadItems(){const {data,error}=await sb.from('items').select('*').order('name');if(error){el('itemrows').innerHTML='<tr><td colspan="4">'+error.message+'</td></tr>';return}el('itemrows').innerHTML=data.map(x=>`<tr><td>${esc(x.sku||'')}</td><td>${esc(x.name)}</td><td>${esc(x.unit||'')}</td><td>${Number(x.opening_quantity||0).toLocaleString()}</td></tr>`).join('')}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+if(localStorage.getItem('ms_sb_url'))connect();
+</script></body></html>

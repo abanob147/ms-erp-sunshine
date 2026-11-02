@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MS ERP | Sunshine</title>
+<style>
+:root{--navy:#14243a;--blue:#2364a5;--bg:#f3f6fa;--line:#e5eaf1;--muted:#718096;--green:#15966a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,"Tahoma",sans-serif;color:#1d2939}
+.app{display:flex;min-height:100vh}.sidebar{width:245px;background:var(--navy);color:#fff;padding:24px 16px;flex-shrink:0}
+.brand{font-size:23px;font-weight:800;letter-spacing:.5px;padding:4px 12px 22px}.brand small{display:block;font-size:11px;color:#a9bdd4;font-weight:400;margin-top:7px}
+.navlabel{color:#8ea4bd;font-size:11px;padding:14px 12px 7px}.nav button{display:flex;width:100%;border:0;background:transparent;color:#d9e4f0;padding:12px;border-radius:9px;text-align:right;cursor:pointer;font-size:14px;gap:10px;align-items:center}.nav button.active,.nav button:hover{background:#263d5b;color:#fff}
+.main{flex:1;min-width:0}.top{height:76px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px}.top strong{font-size:17px}.top-actions{display:flex;gap:12px;align-items:center}.pill{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 12px;color:#344054;cursor:pointer}.user{font-size:13px;color:#667085}
+.content{padding:28px;max-width:1400px;margin:auto}.heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}.heading h1{font-size:24px;margin:0 0 7px}.sub{color:var(--muted);font-size:13px}.primary{background:var(--blue);color:#fff;border:0;border-radius:9px;padding:11px 16px;cursor:pointer}
+.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:20px}.card,.panel{background:#fff;border:1px solid var(--line);border-radius:13px;padding:18px}.card .label{font-size:13px;color:var(--muted)}.value{font-size:25px;font-weight:750;margin:13px 0 5px}.hint{font-size:12px;color:var(--green)}
+.grid{display:grid;grid-template-columns:1.5fr 1fr;gap:16px}.panel h3{margin:0 0 17px;font-size:16px}.currencies{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.currency{background:#f7f9fc;border-radius:10px;padding:13px}.currency b{display:block;font-size:17px;margin:7px 0}.currency span{font-size:12px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:12px 9px;border-bottom:1px solid var(--line);text-align:right}th{color:var(--muted);font-weight:600;background:#fafbfd}.status{color:var(--green);background:#e8f7f1;border-radius:20px;padding:5px 9px;font-size:11px}
+.notice{margin-top:16px;background:#fff8e8;border:1px solid #f3dfae;border-radius:10px;padding:12px 14px;color:#805b13;font-size:12px;line-height:1.7}
+@media(max-width:900px){.sidebar{width:190px}.cards{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}}
+@media(max-width:600px){.app{display:block}.sidebar{width:100%;padding:12px}.brand{padding-bottom:10px}.nav{display:flex;overflow:auto}.navlabel{display:none}.nav button{white-space:nowrap;width:auto;padding:9px}.top{padding:0 14px}.content{padding:17px}.cards{gap:9px}.card{padding:13px}.value{font-size:20px}.heading h1{font-size:20px}.currencies{gap:6px}.currency{padding:9px}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+ <div class="brand">MS ERP<small data-ar="صن شاين للاستيراد والتصدير" data-en="Sunshine Import & Export">صن شاين للاستيراد والتصدير</small></div>
+ <div class="navlabel" data-ar="القائمة الرئيسية" data-en="MAIN MENU">القائمة الرئيسية</div>
+ <nav class="nav">
+  <button class="active" data-ar="▦  لوحة التحكم" data-en="▦  Dashboard">▦ لوحة التحكم</button>
+  <button data-ar="▤  المخازن والأصناف" data-en="▤  Inventory">▤ المخازن والأصناف</button>
+  <button data-ar="↗  المبيعات" data-en="↗  Sales">↗ المبيعات</button>
+  <button data-ar="↙  المشتريات والاستيراد" data-en="↙  Purchases & Import">↙ المشتريات والاستيراد</button>
+  <button data-ar="♙  العملاء" data-en="♙  Customers">♙ العملاء</button>
+  <button data-ar="♧  الموردون" data-en="♧  Suppliers">♧ الموردون</button>
+  <button data-ar="＄  الحسابات والخزينة" data-en="＄  Accounts & Cash">＄ الحسابات والخزينة</button>
+  <button data-ar="▥  التقارير" data-en="▥  Reports">▥ التقارير</button>
+  <button data-ar="⚙  الإعدادات" data-en="⚙  Settings">⚙ الإعدادات</button>
+ </nav>
+</aside>
+<main class="main">
+ <header class="top"><strong data-ar="نظام إدارة الشركة" data-en="Business Management System">نظام إدارة الشركة</strong><div class="top-actions"><span class="user" data-ar="المستخدم: المدير" data-en="User: Admin">المستخدم: المدير</span><button class="pill" id="lang">English</button></div></header>
+ <section class="content">
+  <div class="heading"><div><h1 data-ar="لوحة التحكم" data-en="Dashboard">لوحة التحكم</h1><div class="sub" data-ar="ملخص أداء الشركة وحركة المخزون" data-en="Company performance and inventory overview">ملخص أداء الشركة وحركة المخزون</div></div><button class="primary" data-ar="+ فاتورة جديدة" data-en="+ New Invoice">+ فاتورة جديدة</button></div>
+  <div class="cards">
+   <div class="card"><div class="label" data-ar="إجمالي المبيعات اليوم" data-en="Today's Sales">إجمالي المبيعات اليوم</div><div class="value">0.00 EGP</div><div class="hint" data-ar="لا توجد عمليات مسجلة بعد" data-en="No transactions recorded yet">لا توجد عمليات مسجلة بعد</div></div>
+   <div class="card"><div class="label" data-ar="إجمالي المشتريات" data-en="Total Purchases">إجمالي المشتريات</div><div class="value">0.00 EGP</div><div class="hint" data-ar="ابدأ بتسجيل فاتورة شراء" data-en="Add a purchase invoice to begin">ابدأ بتسجيل فاتورة شراء</div></div>
+   <div class="card"><div class="label" data-ar="أصناف المخزون" data-en="Inventory Items">أصناف المخزون</div><div class="value">0</div><div class="hint" data-ar="مخزن رئيسي واحد" data-en="One main warehouse">مخزن رئيسي واحد</div></div>
+   <div class="card"><div class="label" data-ar="مستحقات العملاء" data-en="Customer Receivables">مستحقات العملاء</div><div class="value">0.00 EGP</div><div class="hint" data-ar="إجمالي الأرصدة المدينة" data-en="Total outstanding balances">إجمالي الأرصدة المدينة</div></div>
+  </div>
+
+  <div class="panel" style="margin-bottom:16px">
+   <div class="heading" style="margin-bottom:16px"><div><h1 style="font-size:19px" data-ar="تسجيل رسالة استيراد جديدة" data-en="Register New Import Shipment">تسجيل رسالة استيراد جديدة</h1><div class="sub" data-ar="متابعة الحاويات والشحنات وتكلفة الوصول" data-en="Track containers, shipments and landed cost">متابعة الحاويات والشحنات وتكلفة الوصول</div></div><span class="status" data-ar="قسم الاستيراد" data-en="Import module">قسم الاستيراد</span></div>
+   <form id="importForm" class="cards" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:0">
+    <label><span class="label" data-ar="اسم / وصف رسالة الاستيراد" data-en="Import shipment name / description">اسم / وصف رسالة الاستيراد</span><input required name="shipment" placeholder="مثال: شحنة مسامير من الصين" style="display:block;width:100%;margin-top:7px;padding:11px;border:1px solid var(--line);border-radius:8px"></label>
+    <label><span class="label" data-ar="موعد وصول الحاوية المتوقع" data-en="Expected container arrival date">موعد وصول الحاوية المتوقع</span><input required name="arrival" type="date" style="display:block;width:100%;margin-top:7px;padding:10px;border:1px solid var(--line);border-radius:8px"></label>
+    <label><span class="label" data-ar="رقم الحاوية" data-en="Container number">رقم الحاوية</span><input name="container" placeholder="Container No." style="display:block;width:100%;margin-top:7px;padding:11px;border:1px solid var(--line);border-radius:8px"></label>
+    <label><span class="label" data-ar="رقم بوليصة الشحن" data-en="Bill of Lading (B/L) No.">رقم بوليصة الشحن</span><input required name="bl" placeholder="B/L Number" style="display:block;width:100%;margin-top:7px;padding:11px;border:1px solid var(--line);border-radius:8px"></label>
+    <label><span class="label" data-ar="قيمة الفاتورة" data-en="Invoice value">قيمة الفاتورة</span><div style="display:flex;gap:6px;margin-top:7px"><input required name="invoice" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;min-width:0;padding:10px;border:1px solid var(--line);border-radius:8px"><select name="currency" style="padding:10px;border:1px solid var(--line);border-radius:8px"><option>USD</option><option>CNY</option><option>EGP</option></select></div></label>
+    <label><span class="label" data-ar="إجمالي التكلفة شامل الجمارك (جنيه)" data-en="Total landed cost incl. customs (EGP)">إجمالي التكلفة شامل الجمارك (جنيه)</span><input required name="landed" type="number" min="0" step="0.01" placeholder="0.00 EGP" style="display:block;width:100%;margin-top:7px;padding:11px;border:1px solid var(--line);border-radius:8px"></label>
+    <div style="grid-column:1/-1;display:flex;justify-content:flex-end"><button class="primary" type="submit" data-ar="حفظ رسالة الاستيراد" data-en="Save Import Shipment">حفظ رسالة الاستيراد</button></div>
+   </form>
+   <div class="sub" style="margin-top:10px" data-ar="يمكن إضافة بيانات الشحن والتكلفة لكل رسالة استيراد على حدة." data-en="Shipping and cost details can be recorded separately for each import shipment.">يمكن إضافة بيانات الشحن والتكلفة لكل رسالة استيراد على حدة.</div>
+  </div>
+  <div class="panel" style="margin-bottom:16px">
+   <h3 data-ar="سجل رسائل الاستيراد" data-en="Import Shipment Register">سجل رسائل الاستيراد</h3>
+   <div style="overflow-x:auto"><table><thead><tr><th data-ar="الرسالة" data-en="Shipment">الرسالة</th><th data-ar="موعد الوصول" data-en="Arrival">موعد الوصول</th><th data-ar="رقم الحاوية" data-en="Container No.">رقم الحاوية</th><th data-ar="بوليصة الشحن" data-en="B/L No.">بوليصة الشحن</th><th data-ar="قيمة الفاتورة" data-en="Invoice value">قيمة الفاتورة</th><th data-ar="التكلفة شامل الجمارك" data-en="Landed cost incl. customs">التكلفة شامل الجمارك</th></tr></thead><tbody id="importRows"><tr><td colspan="6" style="text-align:center;color:#98a2b3;padding:20px" data-ar="لا توجد رسائل استيراد مسجلة" data-en="No import shipments registered">لا توجد رسائل استيراد مسجلة</td></tr></tbody></table></div>
+  </div>
+
+  <div class="grid">
+   <div class="panel"><h3 data-ar="آخر الفواتير" data-en="Recent Invoices">آخر الفواتير</h3><table><thead><tr><th data-ar="رقم الفاتورة" data-en="Invoice No.">رقم الفاتورة</th><th data-ar="النوع" data-en="Type">النوع</th><th data-ar="التاريخ" data-en="Date">التاريخ</th><th data-ar="الإجمالي" data-en="Total">الإجمالي</th><th data-ar="الحالة" data-en="Status">الحالة</th></tr></thead><tbody><tr><td colspan="5" style="text-align:center;color:#98a2b3;padding:26px" data-ar="لا توجد فواتير حتى الآن" data-en="No invoices yet">لا توجد فواتير حتى الآن</td></tr></tbody></table></div>
+   <div class="panel"><h3 data-ar="العملات وأسعار الصرف" data-en="Currencies & Exchange Rates">العملات وأسعار الصرف</h3><div class="currencies"><div class="currency"><span>EGP</span><b>1.00</b><span data-ar="عملة أساسية" data-en="Base currency">عملة أساسية</span></div><div class="currency"><span>USD</span><b>—</b><span data-ar="يُحدد من الإعدادات" data-en="Set in Settings">يُحدد من الإعدادات</span></div><div class="currency"><span>CNY</span><b>—</b><span data-ar="يُحدد من الإعدادات" data-en="Set in Settings">يُحدد من الإعدادات</span></div></div><div class="notice" data-ar="لا توجد ضريبة قيمة مضافة مفعّلة. يمكن إدخال أسعار صرف الدولار واليوان من الإعدادات." data-en="VAT is disabled. USD and CNY exchange rates can be entered in Settings.">لا توجد ضريبة قيمة مضافة مفعّلة. يمكن إدخال أسعار صرف الدولار واليوان من الإعدادات.</div></div>
+  </div>
+ </section>
+</main>
+</div>
+<script>
+let english=false;
+document.getElementById('lang').addEventListener('click',()=>{
+ english=!english;document.documentElement.lang=english?'en':'ar';document.documentElement.dir=english?'ltr':'rtl';
+ document.getElementById('lang').textContent=english?'العربية':'English';
+ document.querySelectorAll('[data-ar][data-en]').forEach(el=>el.textContent=english?el.dataset.en:el.dataset.ar);
+});
+
+document.getElementById('importForm').addEventListener('submit', function(e){
+ e.preventDefault();
+ const f = new FormData(this), row = document.createElement('tr');
+ const vals = [f.get('shipment'), f.get('arrival'), f.get('container') || '—', f.get('bl'), Number(f.get('invoice')).toLocaleString(undefined,{minimumFractionDigits:2})+' '+f.get('currency'), Number(f.get('landed')).toLocaleString(undefined,{minimumFractionDigits:2})+' EGP'];
+ vals.forEach(v=>{const td=document.createElement('td');td.textContent=v;row.appendChild(td)});
+ const body=document.getElementById('importRows');
+ if(body.children.length===1 && body.children[0].children.length===1) body.innerHTML='';
+ body.appendChild(row);this.reset();
+});
+
+document.querySelectorAll('.nav button').forEach(btn=>btn.addEventListener('click',()=>{
+document.getElementById('importForm').addEventListener('submit', function(e){
+ e.preventDefault();
+ const f = new FormData(this), row = document.createElement('tr');
+ const vals = [f.get('shipment'), f.get('arrival'), f.get('container') || '—', f.get('bl'), Number(f.get('invoice')).toLocaleString(undefined,{minimumFractionDigits:2})+' '+f.get('currency'), Number(f.get('landed')).toLocaleString(undefined,{minimumFractionDigits:2})+' EGP'];
+ vals.forEach(v=>{const td=document.createElement('td');td.textContent=v;row.appendChild(td)});
+ const body=document.getElementById('importRows');
+ if(body.children.length===1 && body.children[0].children.length===1) body.innerHTML='';
+ body.appendChild(row);this.reset();
+});
+
+document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}));
+</script>
+</body></html>

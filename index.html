@@ -1,183 +1,80 @@
-<!doctype html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MS ERP | Sunshine Import & Export</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<style>
-:root{--p:#d41470;--pd:#a90d58;--soft:#fff0f6;--bg:#f7f7fb;--ink:#202438;--muted:#73788b;--line:#ece8ef}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Tahoma,sans-serif}button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:9px;padding:10px 15px;background:var(--p);color:#fff}input,select{width:100%;padding:11px;border:1px solid #d9d5df;border-radius:8px;background:#fff}header{background:linear-gradient(115deg,var(--pd),var(--p));color:#fff;padding:14px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.brand{display:flex;align-items:center;gap:12px}.brand img{width:52px;height:52px;object-fit:contain;background:#fff;border-radius:10px;padding:3px}.wrap{max-width:1400px;margin:22px auto;padding:0 16px}.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 6px 22px #24142d0a}.login{max-width:440px;margin:7vh auto}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}label{display:block;font-size:13px;margin:9px 0 5px;color:#555b6d}.muted{font-size:13px;color:var(--muted)}.msg{margin-top:10px;font-size:13px}.error{color:#a11}.ok{color:#16764e}nav{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:15px}nav button{background:var(--soft);color:var(--pd)}nav button.active{background:var(--p);color:white}.hidden{display:none!important}.layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px}.side{height:max-content;position:sticky;top:12px}.side button{display:block;width:100%;text-align:right;margin:4px 0;background:transparent;color:#444}.side button.active,.side button:hover{background:var(--soft);color:var(--pd)}table{width:100%;border-collapse:collapse;min-width:650px}th,td{text-align:right;padding:10px;border-bottom:1px solid var(--line);font-size:13px}th{background:#fff7fa}.scroll{overflow:auto}.secondary{background:#64748b}.invoice-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border-bottom:2px solid #d41470;padding-bottom:12px;margin-bottom:16px}.invoice-head h2{color:#a90d58;margin:0 0 6px}.invoice-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px}.invoice-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.invoice-total{max-width:340px;margin:14px 0 0 auto}.invoice-total div{display:flex;justify-content:space-between;align-items:center;padding:7px;border-bottom:1px solid #ddd}.customer-tools{display:flex;gap:8px;align-items:end;flex-wrap:wrap}.customer-tools>div{flex:1;min-width:180px}
-@media(max-width:800px){.layout{grid-template-columns:1fr}.side{position:static}.side nav{display:grid;grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){.invoice-fields{grid-template-columns:1fr}}
-@media print{@page{size:A4;margin:12mm}body *{visibility:hidden!important}#invoicePrint,#invoicePrint *{visibility:visible!important}#invoicePrint{display:block!important;position:absolute!important;left:0!important;top:0!important;width:100%!important;margin:0!important;padding:0!important;border:0!important;box-shadow:none!important;background:#fff!important;color:#000!important}#invoicePrint button,#invoicePrint .no-print{display:none!important}#invoicePrint input,#invoicePrint select{border:0!important;padding:2px 0!important;color:#000!important;background:transparent!important;appearance:none!important}#invoicePrint table{min-width:0!important;width:100%!important}#invoicePrint .scroll{overflow:visible!important}#invoicePrint th,#invoicePrint td{color:#000!important;border:1px solid #777!important}}
-</style></head><body>
-<header><div class="brand"><img src="sunshine-logo.png" alt="Sunshine"><div><b style="font-size:20px">MS ERP</b><div class="muted" style="color:#fff">Sunshine Import &amp; Export</div></div></div><div id="topuser" class="hidden"><span id="who"></span> <button class="secondary" onclick="logout()">تسجيل الخروج</button></div></header>
-<div class="wrap">
-<section id="setup" class="card"><h2>إعداد الاتصال بقاعدة البيانات</h2><p class="muted">استخدم Project URL ومفتاح Publishable فقط. لا تضع Secret أو service_role هنا.</p><div class="grid"><div><label>Supabase Project URL</label><input id="url" placeholder="https://xxxx.supabase.co"></div><div><label>Publishable key</label><input id="key" placeholder="sb_publishable_..."></div></div><button onclick="saveConfig()">حفظ الاتصال</button><p id="setupmsg" class="msg"></p></section>
-<section id="login" class="card login hidden"><h2 id="loginTitle">تسجيل دخول المدير</h2><label>نوع الحساب</label><select id="loginType" onchange="switchLogin()"><option value="admin">المدير - البريد الإلكتروني</option><option value="employee">الموظف - اسم المستخدم</option></select><div id="emailBox"><label>البريد الإلكتروني</label><input id="email" type="email" autocomplete="username"></div><div id="usernameBox" class="hidden"><label>اسم المستخدم</label><input id="username" autocomplete="username"></div><label>كلمة المرور</label><input id="password" type="password" autocomplete="current-password"><button onclick="login()">دخول</button><p id="loginmsg" class="msg"></p></section>
-<section id="application" class="hidden"><div class="layout"><aside class="card side"><b>القائمة الرئيسية</b><nav id="nav">
-<button class="active" onclick="openPage('dashboard',this)">لوحة التحكم</button><button onclick="openPage('items',this)">الأصناف والمخزون</button><button data-admin="1" onclick="openPage('shipments',this)">شحنات الاستيراد</button><button onclick="openPage('sales',this)">المبيعات</button><button onclick="openPage('customers',this)">العملاء</button><button onclick="openPage('purchases',this)">المشتريات</button><button onclick="openPage('suppliers',this)">الموردون</button><button onclick="openPage('accounts',this)">الحسابات والخزينة</button><button onclick="openPage('reports',this)">التقارير</button><button data-admin="1" onclick="openPage('settings',this)">إعدادات المدير</button></nav></aside><main><div class="card"><h2 id="pageTitle">لوحة التحكم</h2><p class="muted">العملة الأساسية EGP — العملات USD و CNY — بدون ضريبة قيمة مضافة</p></div>
-<div id="dashboard" class="card"><h3>مرحبًا بك في نظام Sunshine</h3><p class="muted">اختر القسم من القائمة.</p></div>
-<div id="items" class="card hidden"><h3>الأصناف والمخزون</h3><div class="grid"><div><label>اسم الصنف</label><input id="iname"></div><div><label>كود الصنف SKU</label><input id="isku"></div><div><label>كود إضافي</label><input id="icode"></div><div><label>الوحدة</label><input id="iunit" placeholder="قطعة / كرتونة / كيلو"></div><div><label>سعر الشراء</label><input id="ipurchase" type="number" min="0"></div><div><label>سعر البيع</label><input id="isale" type="number" min="0"></div><div><label>الرصيد الافتتاحي</label><input id="iqty" type="number" min="0" value="0"></div></div><button onclick="addItem()">حفظ الصنف</button><p id="itemmsg" class="msg"></p><div class="scroll"><table><thead><tr><th>SKU</th><th>الكود</th><th>الصنف</th><th>الوحدة</th><th>شراء</th><th>بيع</th><th>الرصيد</th></tr></thead><tbody id="itemrows"></tbody></table></div></div>
-<div id="shipments" class="card hidden"><h3>شحنات الاستيراد</h3><div class="grid"><div><label>اسم الشحنة</label><input id="sname"></div><div><label>تاريخ الوصول المتوقع</label><input id="arrival" type="date"></div><div><label>رقم الحاوية</label><input id="container"></div><div><label>رقم بوليصة الشحن</label><input id="bl"></div><div><label>قيمة الفاتورة</label><input id="invoice" type="number" min="0"></div><div><label>عملة الفاتورة</label><select id="currency"><option>USD</option><option>CNY</option><option>EGP</option></select></div><div><label>التكلفة النهائية بعد الجمارك (EGP)</label><input id="landed" type="number" min="0"></div></div><button onclick="addShipment()">حفظ الشحنة</button><p id="shipmsg" class="msg"></p><div class="scroll"><table><thead><tr><th>الشحنة</th><th>الوصول</th><th>الحاوية</th><th>البوليصة</th><th>الفاتورة</th><th>التكلفة EGP</th></tr></thead><tbody id="shiprows"></tbody></table></div></div>
-<div id="customers" class="card hidden"><h3>العملاء</h3><div class="grid"><div><label>اسم العميل</label><input id="custName"></div><div><label>رقم الهاتف</label><input id="custPhone"></div><div><label>العنوان</label><input id="custAddress"></div></div><button id="customerSaveBtn" onclick="saveCustomer()">حفظ العميل</button><button id="customerCancelBtn" class="secondary hidden" onclick="cancelCustomerEdit()">إلغاء التعديل</button><button class="secondary" onclick="loadCustomers()">تحديث القائمة</button><p id="custmsg" class="msg"></p><div class="scroll"><table><thead><tr><th>الاسم</th><th>الهاتف</th><th>العنوان</th><th>الإجراءات</th></tr></thead><tbody id="custrows"></tbody></table></div></div>
-<div id="sales" class="card hidden"><div id="invoicePrint">
-<div class="invoice-head"><div><h2>Sunshine Import &amp; Export</h2><div>فاتورة مبيعات</div><small>MS ERP</small></div><div><b>رقم الفاتورة:</b> <input id="invNo" value="جارٍ التحميل..." readonly style="width:130px;background:#f3f4f6"><br><b>التاريخ:</b> <input id="invDate" type="date" style="width:150px"></div></div>
-<div class="invoice-fields">
-<div><label>اختيار عميل مسجل</label><select id="customerSelect" onchange="chooseCustomer()"><option value="">-- اختر العميل --</option></select></div>
-<div><label>أو اسم العميل</label><input id="invCustomer" placeholder="اسم العميل"></div>
-<div><label>رقم الهاتف</label><input id="invPhone" placeholder="رقم الهاتف"></div>
-<div><label>العنوان</label><input id="invAddress" placeholder="عنوان العميل"></div>
-<div><label>العملة</label><select id="invCurrency"><option>EGP</option><option>USD</option><option>CNY</option></select></div>
-</div>
-<div class="scroll"><table id="invoiceTable"><thead><tr><th>الصنف / البيان</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th><th class="no-print">حذف</th></tr></thead><tbody id="invoiceRows"></tbody></table></div>
-<div class="invoice-actions no-print"><button type="button" onclick="addInvoiceRow()">إضافة صنف</button><button type="button" onclick="saveInvoice()">حفظ الفاتورة</button><button type="button" class="secondary" onclick="loadSalesArchive()">أرشيف الفواتير</button><button type="button" onclick="window.print()">طباعة الفاتورة</button></div><p id="salesmsg" class="msg no-print"></p><div id="salesArchive" class="no-print hidden"><h3>أرشيف الفواتير</h3><div class="scroll"><table><thead><tr><th>رقم الفاتورة</th><th>اسم العميل</th><th>التاريخ</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>العملة</th><th>التفاصيل</th></tr></thead><tbody id="archiveRows"></tbody></table></div></div>
-<div class="invoice-total"><div><b>الإجمالي</b><strong id="invGrand">0.00</strong></div><div><b>المدفوع</b><input id="invPaid" type="number" min="0" value="0" oninput="calcInvoice()" style="max-width:140px"></div><div><b>المتبقي</b><strong id="invDue">0.00</strong></div></div><div style="margin-top:28px;border-top:1px solid #aaa;padding-top:10px;text-align:center">شكرًا لتعاملكم معنا</div>
-</div><p class="muted no-print">راجع الأصناف والكميات والأسعار قبل الحفظ. الحفظ يخصم المخزون من قاعدة البيانات من خلال عملية واحدة.</p></div>
-<div id="placeholder" class="card hidden"><h3 id="placeholderTitle"></h3><p class="muted">هذه الوحدة في مرحلة التوصيل بقاعدة البيانات.</p></div></main></div></section></div>
-<script>
-let sb=null,role=null,itemsCache=[],customersCache=[],pendingSaleRequestId=null,editingCustomerId=null;const $=id=>document.getElementById(id);
-function newSaleRequestId(){if(window.crypto&&crypto.randomUUID)return crypto.randomUUID();return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==='x'?r:(r&3|8)).toString(16)})}
-function saveConfig(){const u=$('url').value.trim(),k=$('key').value.trim();if(!u||!k){$('setupmsg').textContent='أدخل الرابط ومفتاح النشر العام';return}localStorage.setItem('sun_url',u);localStorage.setItem('sun_key',k);connect()}
-function connect(){const u=localStorage.getItem('sun_url'),k=localStorage.getItem('sun_key');if(!u||!k)return;$('url').value=u;$('key').value=k;sb=window.supabase.createClient(u,k);$('setup').classList.add('hidden');$('login').classList.remove('hidden');sb.auth.getSession().then(async({data})=>{if(data.session)await enterApp()})}
-function switchLogin(){const emp=$('loginType').value==='employee';$('emailBox').classList.toggle('hidden',emp);$('usernameBox').classList.toggle('hidden',!emp);$('loginTitle').textContent=emp?'تسجيل دخول الموظف':'تسجيل دخول المدير'}
-async function login(){const emp=$('loginType').value==='employee';const email=emp?$('username').value.trim().toLowerCase()+'@employees.sunshine-erp.invalid':$('email').value.trim();$('loginmsg').textContent='جارٍ التحقق...';const {error}=await sb.auth.signInWithPassword({email,password:$('password').value});if(error){$('loginmsg').textContent='بيانات الدخول غير صحيحة: '+error.message;$('loginmsg').className='msg error';return}await enterApp()}
-async function enterApp(){const {data:{user}}=await sb.auth.getUser();const {data,error}=await sb.rpc('current_user_role');if(error||!data){await sb.auth.signOut();$('loginmsg').textContent='لم يتم العثور على صلاحية لهذا الحساب. راجع user_roles.';return}role=data;$('who').textContent=user.email+' ('+(role==='admin'?'مدير':'موظف')+')';$('topuser').classList.remove('hidden');$('login').classList.add('hidden');$('application').classList.remove('hidden');document.querySelectorAll('[data-admin="1"]').forEach(b=>b.classList.toggle('hidden',role!=='admin'));await loadItems();await loadCustomers();await loadNextInvoiceNumber();if(role==='admin')await loadShipments()}
-async function logout(){await sb.auth.signOut();location.reload()}
-function openPage(id,btn){if(id==='shipments'&&role!=='admin'){alert('غير مسموح');return}document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');['dashboard','items','shipments','sales','customers','placeholder'].forEach(x=>$(x).classList.add('hidden'));$('pageTitle').textContent=btn?btn.textContent.trim():id;if(['dashboard','items','shipments','sales','customers'].includes(id))$(id).classList.remove('hidden');else{$('placeholder').classList.remove('hidden');$('placeholderTitle').textContent=btn?btn.textContent.trim():id}if(id==='sales'){loadItems();loadCustomers();if(!$('invoiceRows').children.length)addInvoiceRow()}}
-function msg(id,t,ok){$(id).textContent=t;$(id).className='msg '+(ok?'ok':'error')}
-async function addItem(){const row={name:$('iname').value.trim(),sku:$('isku').value.trim()||null,item_code:$('icode').value.trim()||null,unit:$('iunit').value.trim()||null,purchase_price:Number($('ipurchase').value||0),sale_price:Number($('isale').value||0),opening_quantity:Number($('iqty').value||0)};if(!row.name){msg('itemmsg','اكتب اسم الصنف',false);return}const {error}=await sb.from('items').insert(row);if(error){msg('itemmsg',error.message,false);return}msg('itemmsg','تم حفظ الصنف',true);['iname','isku','icode','iunit','ipurchase','isale'].forEach(x=>$(x).value='');$('iqty').value=0;await loadItems()}
-async function loadItems(){if(!sb)return;const {data,error}=await sb.from('items').select('id,sku,item_code,name,unit,purchase_price,sale_price,opening_quantity').order('name');if(error){$('itemrows').innerHTML='<tr><td colspan="7">'+esc(error.message)+'</td></tr>';itemsCache=[];refreshInvoiceItemLists();return}itemsCache=data||[];$('itemrows').innerHTML=itemsCache.map(x=>`<tr><td>${esc(x.sku)}</td><td>${esc(x.item_code)}</td><td>${esc(x.name)}</td><td>${esc(x.unit)}</td><td>${Number(x.purchase_price||0).toLocaleString()}</td><td>${Number(x.sale_price||0).toLocaleString()}</td><td>${Number(x.opening_quantity||0).toLocaleString()}</td></tr>`).join('');refreshInvoiceItemLists()}
-function refreshInvoiceItemLists(){document.querySelectorAll('.invoice-product').forEach(sel=>{const old=sel.value;sel.innerHTML='<option value="">-- اختر صنفًا من المخزون --</option>'+itemsCache.map((x,i)=>`<option value="${i}">${esc(x.name)}${x.sku?' - '+esc(x.sku):''}</option>`).join('');if(old!=='')sel.value=old})}
-async function loadCustomers(){
- if(!sb)return;
- const {data,error}=await sb.from('customers').select('id,name,phone,address').order('name');
- if(error){customersCache=[];$('custrows').innerHTML='<tr><td colspan="4">تعذر تحميل العملاء: '+esc(error.message)+'</td></tr>';$('customerSelect').innerHTML='<option value="">-- لا توجد قائمة عملاء متاحة --</option>';return}
- customersCache=data||[];
- $('custrows').innerHTML=customersCache.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.phone||'')}</td><td>${esc(c.address||'')}</td><td><button type="button" class="secondary" onclick="editCustomer('${esc(c.id)}')">تعديل</button> <button type="button" style="background:#b91c1c" onclick="deleteCustomer('${esc(c.id)}')">حذف</button> <button type="button" style="background:#16a34a" onclick="customerWhatsApp('${esc(c.id)}')">واتساب</button></td></tr>`).join('')||'<tr><td colspan="4">لا يوجد عملاء مسجلون</td></tr>';
- $('customerSelect').innerHTML='<option value="">-- اختر العميل --</option>'+customersCache.map((c,i)=>`<option value="${i}">${esc(c.name)}${c.phone?' - '+esc(c.phone):''}</option>`).join('');
-}
-function editCustomer(id){
- const c=customersCache.find(x=>String(x.id)===String(id));
- if(!c){msg('custmsg','لم يتم العثور على العميل',false);return}
- editingCustomerId=c.id;
- $('custName').value=c.name||'';$('custPhone').value=c.phone||'';$('custAddress').value=c.address||'';
- $('customerSaveBtn').textContent='حفظ التعديلات';$('customerCancelBtn').classList.remove('hidden');
- msg('custmsg','تم تحميل بيانات العميل للتعديل',true);
-}
-function cancelCustomerEdit(){
- editingCustomerId=null;
- ['custName','custPhone','custAddress'].forEach(id=>$(id).value='');
- $('customerSaveBtn').textContent='حفظ العميل';$('customerCancelBtn').classList.add('hidden');
-}
-async function saveCustomer(){
- if(!sb){msg('custmsg','اتصال قاعدة البيانات غير جاهز',false);return}
- const row={name:$('custName').value.trim(),phone:$('custPhone').value.trim()||null,address:$('custAddress').value.trim()||null};
- if(!row.name){msg('custmsg','اكتب اسم العميل أولًا',false);return}
- if(editingCustomerId!==null){
-  const id=editingCustomerId;
-  const {data,error}=await sb.from('customers').update(row).eq('id',id).select('id').maybeSingle();
-  if(error){msg('custmsg','فشل تعديل العميل: '+error.message,false);return}
-  if(!data){msg('custmsg','لم يتم تحديث أي سجل. تحقق من صلاحيات التعديل وسياسة الوصول في قاعدة البيانات.',false);return}
-  msg('custmsg','تم تعديل نفس العميل بنجاح',true);
- }else{
-  const {error}=await sb.from('customers').insert(row);
-  if(error){msg('custmsg','لم يتم حفظ العميل: '+error.message,false);return}
-  msg('custmsg','تم حفظ العميل بنجاح',true);
- }
- cancelCustomerEdit();await loadCustomers();
-}
-async function deleteCustomer(id){
- const c=customersCache.find(x=>String(x.id)===String(id));if(!c)return;
- if(!confirm('هل تريد حذف العميل '+c.name+'؟'))return;
- const {error}=await sb.from('customers').delete().eq('id',id);
- if(error){msg('custmsg','تعذر حذف العميل: '+error.message,false);return}
- msg('custmsg','تم حذف العميل',true);await loadCustomers();
-}
-function customerWhatsApp(id){
- const c=customersCache.find(x=>String(x.id)===String(id));if(!c)return;
- let phone=String(c.phone||'').replace(/[^0-9]/g,'');
- if(phone.startsWith('0'))phone='2'+phone;
- if(!phone){msg('custmsg','لا يوجد رقم هاتف لهذا العميل',false);return}
- const message=encodeURIComponent('مرحبًا '+(c.name||'')+'، تحياتنا من صن شاين للاستيراد والتصدير.');
- window.open('https://wa.me/'+phone+'?text='+message,'_blank');
-}
-function chooseCustomer(){const c=customersCache[Number($('customerSelect').value)];if(!c)return;$('invCustomer').value=c.name||'';$('invPhone').value=c.phone||'';$('invAddress').value=c.address||''}
-async function addCustomer(){return saveCustomer()}
-async function addShipment(){const row={name:$('sname').value.trim(),expected_arrival:$('arrival').value||null,container_number:$('container').value.trim()||null,bl_number:$('bl').value.trim()||null,invoice_value:Number($('invoice').value||0),invoice_currency:$('currency').value,landed_cost_egp:Number($('landed').value||0)};if(!row.name){msg('shipmsg','اكتب اسم الشحنة',false);return}const {error}=await sb.from('import_shipments').insert(row);if(error){msg('shipmsg',error.message,false);return}msg('shipmsg','تم حفظ الشحنة بنجاح',true);['sname','arrival','container','bl','invoice','landed'].forEach(x=>$(x).value='');loadShipments()}
-async function loadShipments(){const {data,error}=await sb.from('import_shipments').select('name,expected_arrival,container_number,bl_number,invoice_value,invoice_currency,landed_cost_egp').order('created_at',{ascending:false});if(error){$('shiprows').innerHTML='<tr><td colspan="6">'+esc(error.message)+'</td></tr>';return}$('shiprows').innerHTML=(data||[]).map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.expected_arrival)}</td><td>${esc(x.container_number)}</td><td>${esc(x.bl_number)}</td><td>${Number(x.invoice_value||0).toLocaleString()} ${esc(x.invoice_currency)}</td><td>${Number(x.landed_cost_egp||0).toLocaleString()}</td></tr>`).join('')}
-async function loadNextInvoiceNumber(){
-  if(!sb)return;
-  const field=$('invNo');
-  field.value='جارٍ تحميل الرقم...';
-  const {data,error}=await sb.rpc('next_sales_invoice_number');
-  if(error){field.value='';msg('salesmsg','تعذر إنشاء رقم الفاتورة تلقائيًا: '+error.message,false);return}
-  field.value=data;
-}
-function addInvoiceRow(){const tr=document.createElement('tr');tr.innerHTML='<td><select class="invoice-product" onchange="selectInvoiceProduct(this)"><option value="">-- اختر صنفًا من المخزون --</option></select><input class="manual-product hidden" placeholder="اكتب بيانًا يدويًا"></td><td><input class="qty" type="number" min="0" step="0.01" value="1" oninput="calcInvoice()" style="min-width:65px"></td><td><input class="price" type="number" min="0" step="0.01" value="0" oninput="calcInvoice()" style="min-width:85px"></td><td class="line-total">0.00</td><td class="no-print"><button type="button" class="secondary" onclick="this.closest(\'tr\').remove();calcInvoice()">حذف</button></td>'; $('invoiceRows').appendChild(tr);refreshInvoiceItemLists();calcInvoice()}
-function selectInvoiceProduct(sel){const row=sel.closest('tr'),item=itemsCache[Number(sel.value)];if(!item)return;row.querySelector('.manual-product').classList.add('hidden');row.querySelector('.price').value=Number(item.sale_price||0);calcInvoice()}
-function calcInvoice(){let total=0;document.querySelectorAll('#invoiceRows tr').forEach(tr=>{const q=Number(tr.querySelector('.qty')?.value||0),p=Number(tr.querySelector('.price')?.value||0),v=q*p;tr.querySelector('.line-total').textContent=v.toFixed(2);total+=v});const paid=Number($('invPaid').value||0);$('invGrand').textContent=total.toFixed(2);$('invDue').textContent=(total-paid).toFixed(2)}
+let editingCustomerId = null;
 
-async function saveInvoice(){
-  if(!sb){msg('salesmsg','اتصال قاعدة البيانات غير متاح',false);return}
-  const button=[...document.querySelectorAll('.invoice-actions button')].find(b=>b.textContent.includes('حفظ الفاتورة'));
-  const rows=[...document.querySelectorAll('#invoiceRows tr')],lines=[];
-  if(!rows.length){msg('salesmsg','أضف صنفًا واحدًا على الأقل',false);return}
-  for(let i=0;i<rows.length;i++){
-    const tr=rows[i],selected=tr.querySelector('.invoice-product').value;
-    if(selected===''){msg('salesmsg','اختر صنفًا من المخزون في كل سطر',false);return}
-    const item=itemsCache[Number(selected)],quantity=Number(tr.querySelector('.qty').value||0),unitPrice=Number(tr.querySelector('.price').value||0);
-    if(!item||!Number.isFinite(Number(item.id))){msg('salesmsg','تعذر تحديد الصنف في السطر '+(i+1),false);return}
-    if(!(quantity>0)||!Number.isFinite(unitPrice)||unitPrice<0){msg('salesmsg','راجع الكمية والسعر في السطر '+(i+1),false);return}
-    lines.push({item_id:Number(item.id),quantity,unit_price:unitPrice});
-  }
-  const total=lines.reduce((sum,x)=>sum+x.quantity*x.unit_price,0),paid=Number($('invPaid').value||0),invoiceNo=$('invNo').value.trim();
-  if(!invoiceNo){msg('salesmsg','اكتب رقم الفاتورة',false);return}
-  if(!Number.isFinite(paid)||paid<0||paid>total){msg('salesmsg','المدفوع يجب أن يكون بين صفر وإجمالي الفاتورة',false);return}
-  let customerId=null;
-  if($('customerSelect').value!==''){
-    const customer=customersCache[Number($('customerSelect').value)];
-    if(customer&&customer.id!==undefined&&customer.id!==null)customerId=Number(customer.id);
-  }
-  if(!pendingSaleRequestId)pendingSaleRequestId=newSaleRequestId();
-  if(button){button.disabled=true;button.textContent='جارٍ الحفظ...'}
-  msg('salesmsg','جارٍ حفظ الفاتورة وتحديث المخزون...',true);
-  try{
-    const {data,error}=await sb.rpc('save_sale_and_deduct_stock',{
-      p_invoice_number:invoiceNo,p_customer_id:customerId,
-      p_invoice_date:$('invDate').value||new Date().toISOString().slice(0,10),
-      p_total_amount:total,p_paid_amount:paid,p_currency:$('invCurrency').value,
-      p_discount_amount:0,p_exchange_rate:1,p_items:lines,p_request_id:pendingSaleRequestId
-    });
-    if(error)throw error;
-    pendingSaleRequestId=null;
-    msg('salesmsg','تم حفظ الفاتورة بنجاح وخصم المخزون. رقم السجل: '+data,true);
-    await loadItems();await loadSalesArchive();
-    $('invPaid').value='0';$('invoiceRows').innerHTML='';addInvoiceRow();
-    $('customerSelect').value='';$('invCustomer').value='';$('invPhone').value='';$('invAddress').value='';
-    await loadNextInvoiceNumber();calcInvoice();
-  }catch(err){msg('salesmsg','لم يتم حفظ الفاتورة: '+(err.message||String(err))+' — لم يتم اعتماد خصم جزئي. يمكنك إعادة المحاولة بأمان.',false)}
-  finally{if(button){button.disabled=false;button.textContent='حفظ الفاتورة'}}
-}
-async function loadSalesArchive(){
-  if(!sb)return;
-  $('salesArchive').classList.remove('hidden');
-  $('archiveRows').innerHTML='<tr><td colspan="8">جارٍ تحميل الأرشيف...</td></tr>';
-  const {data,error}=await sb.from('sales').select('id,invoice_number,customer_id,invoice_date,total_amount,paid_amount,remaining_amount,currency').order('invoice_date',{ascending:false}).limit(100);
-  if(error){$('archiveRows').innerHTML='<tr><td colspan="8">تعذر تحميل الأرشيف: '+esc(error.message)+'</td></tr>';return}
-  const customerNames=new Map(customersCache.map(c=>[String(c.id),c.name]));
-  $('archiveRows').innerHTML=(data||[]).map(x=>`<tr><td>${esc(x.invoice_number)}</td><td>${esc(customerNames.get(String(x.customer_id))||'غير محدد')}</td><td>${esc(x.invoice_date)}</td><td>${Number(x.total_amount||0).toLocaleString()}</td><td>${Number(x.paid_amount||0).toLocaleString()}</td><td>${Number(x.remaining_amount||0).toLocaleString()}</td><td>${esc(x.currency)}</td><td><button type="button" class="secondary" onclick="showSaleDetails('${String(x.id).replace(/'/g,'')}')">عرض</button></td></tr>`).join('')||'<tr><td colspan="8">لا توجد فواتير محفوظة.</td></tr>';
-}
-async function showSaleDetails(id){
-  const {data:sale,error}=await sb.from('sales').select('id,invoice_number,customer_id,invoice_date,total_amount,paid_amount,remaining_amount,currency').eq('id',id).single();
-  if(error){msg('salesmsg','تعذر فتح الفاتورة: '+error.message,false);return}
-  const {data:details,error:detailError}=await sb.from('sale_items').select('item_id,quantity,unit_price,total').eq('sale_id',id);
-  if(detailError){msg('salesmsg','تعذر تحميل تفاصيل الفاتورة: '+detailError.message,false);return}
-  const names=new Map(itemsCache.map(x=>[String(x.id),x.name]));
-  const lines=(details||[]).map(x=>`${names.get(String(x.item_id))||('صنف رقم '+x.item_id)} — كمية ${x.quantity} — سعر ${x.unit_price} — إجمالي ${x.total}`).join('\n');
-  const customerName=customersCache.find(c=>String(c.id)===String(sale.customer_id))?.name||'غير محدد';
-  alert(`فاتورة ${sale.invoice_number}\nالعميل: ${customerName}\nالتاريخ: ${sale.invoice_date}\nالإجمالي: ${sale.total_amount} ${sale.currency}\nالمدفوع: ${sale.paid_amount}\nالمتبقي: ${sale.remaining_amount}\n\n${lines}`);
+async function addCustomer() {
+    const row = {
+        name: $('custName').value.trim(),
+        phone: $('custPhone').value.trim() || null,
+        address: $('custAddress').value.trim() || null
+    };
+
+    if (!row.name) {
+        msg('custmsg', 'اكتب اسم العميل أولاً', false);
+        return;
+    }
+
+    let result;
+
+    if (editingCustomerId !== null) {
+        result = await sb
+            .from('customers')
+            .update(row)
+            .eq('id', editingCustomerId)
+            .select('id')
+            .maybeSingle();
+
+        if (!result.data && !result.error) {
+            msg('custmsg', 'لم يتم العثور على العميل المطلوب تعديله', false);
+            return;
+        }
+    } else {
+        result = await sb
+            .from('customers')
+            .insert(row);
+    }
+
+    if (result.error) {
+        msg('custmsg', 'خطأ في الحفظ: ' + result.error.message, false);
+        return;
+    }
+
+    msg(
+        'custmsg',
+        editingCustomerId !== null
+            ? 'تم تعديل بيانات العميل بنجاح'
+            : 'تم حفظ العميل بنجاح',
+        true
+    );
+
+    cancelCustomerEdit();
+    await loadCustomers();
 }
 
-function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-$('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem('sun_url'))connect();
-</script></body></html>
+function editCustomer(id) {
+    const customer = customersCache.find(
+        c => String(c.id) === String(id)
+    );
+
+    if (!customer) return;
+
+    editingCustomerId = customer.id;
+
+    $('custName').value = customer.name || '';
+    $('custPhone').value = customer.phone || '';
+    $('custAddress').value = customer.address || '';
+
+    $('customerSaveBtn').textContent = 'حفظ التعديلات';
+    $('customerCancelBtn').classList.remove('hidden');
+
+    msg('custmsg', 'أنت الآن تعدل بيانات العميل', true);
+}
+
+function cancelCustomerEdit() {
+    editingCustomerId = null;
+
+    $('custName').value = '';
+    $('custPhone').value = '';
+    $('custAddress').value = '';
+
+    $('customerSaveBtn').textContent = 'حفظ العميل';
+    $('customerCancelBtn').classList.add('hidden');
+}

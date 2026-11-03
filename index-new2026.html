@@ -1,75 +1,37 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MS ERP | Sunshine Import & Export</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-:root{--primary:#d41470;--primary-dark:#a90d58;--pink-soft:#fff0f6;--bg:#f7f7fb;--ink:#202438;--muted:#73788b;--line:#ece8ef;--white:#fff;--green:#16865b;--shadow:0 8px 28px rgba(36,20,45,.07)}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Tahoma,sans-serif}
-button,input,select{font:inherit}button{cursor:pointer}
-.topbar{background:linear-gradient(115deg,var(--primary-dark),var(--primary));color:#fff;padding:14px 22px;display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap;box-shadow:var(--shadow)}
-.brand{display:flex;align-items:center;gap:12px}.brand img{width:58px;height:58px;object-fit:contain;background:#fff;border-radius:12px;padding:4px}.brand h1{font-size:21px;margin:0 0 4px}.brand small{opacity:.9}.top-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.btn{border:0;border-radius:9px;padding:10px 14px;background:var(--primary);color:#fff}.btn.light{background:#fff;color:var(--primary-dark)}.btn.ghost{background:#ffffff22;color:#fff;border:1px solid #ffffff55}
-.layout{display:grid;grid-template-columns:235px minmax(0,1fr);gap:20px;max-width:1500px;margin:22px auto;padding:0 18px}
-.sidebar,.card{background:var(--white);border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow)}
-.sidebar{padding:14px;height:max-content;position:sticky;top:15px}.side-title{font-size:12px;color:var(--muted);padding:8px 10px}.nav{display:grid;gap:5px}.nav button{border:0;background:transparent;text-align:right;padding:11px 12px;border-radius:9px;color:#4b5062}.nav button.active,.nav button:hover{background:var(--pink-soft);color:var(--primary-dark);font-weight:bold}
-main{min-width:0}.page-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2px 0 16px}.page-head h2{margin:0;font-size:22px}.muted{color:var(--muted);font-size:13px}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin-bottom:17px}.stat{padding:17px}.stat .label{color:var(--muted);font-size:13px}.stat strong{display:block;font-size:25px;margin-top:10px}.stat .dot{width:9px;height:9px;border-radius:50%;background:var(--primary);display:inline-block;margin-left:6px}
-.card{padding:18px;margin-bottom:16px}.card h3{margin:0 0 14px;font-size:17px}.placeholder{padding:25px 16px;border:1px dashed #e7c6d6;background:#fffafd;border-radius:12px;text-align:center;color:var(--muted);line-height:1.8}
-.quick{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.quick button{background:var(--pink-soft);color:var(--primary-dark);border:1px solid #f5d4e3;border-radius:10px;padding:14px;text-align:right}
-.hidden{display:none!important}.footer{text-align:center;color:var(--muted);font-size:12px;padding:10px 0 25px}
-@media(max-width:900px){.layout{grid-template-columns:1fr}.sidebar{position:static}.nav{grid-template-columns:repeat(2,minmax(0,1fr))}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:520px){.layout{padding:0 10px;margin:12px auto}.topbar{padding:12px}.brand img{width:48px;height:48px}.stats{gap:8px}.stat{padding:12px}.stat strong{font-size:20px}.quick{grid-template-columns:1fr}.nav{grid-template-columns:1fr 1fr}}
-</style>
-</head>
-<body>
-<header class="topbar">
- <div class="brand"><img src="sunshine-logo.png" alt="Sunshine logo"><div><h1>MS ERP</h1><small>Sunshine Import &amp; Export</small></div></div>
- <div class="top-actions"><span id="today"></span><button class="btn ghost" onclick="toggleLanguage()" id="langBtn">English</button><button class="btn light" onclick="alert('سيتم ربط تسجيل الدخول بقاعدة البيانات في الخطوة التالية.')">تسجيل الدخول</button></div>
-</header>
-<div class="layout">
- <aside class="sidebar">
-  <div class="side-title" data-ar="القائمة الرئيسية" data-en="MAIN MENU">القائمة الرئيسية</div>
-  <nav class="nav" id="nav">
-   <button class="active" data-page="dashboard">◈ <span data-ar="لوحة التحكم" data-en="Dashboard">لوحة التحكم</span></button>
-   <button data-page="items">▦ <span data-ar="الأصناف والمخزون" data-en="Items & Inventory">الأصناف والمخزون</span></button>
-   <button data-page="sales">↗ <span data-ar="المبيعات" data-en="Sales">المبيعات</span></button>
-   <button data-page="purchases">↙ <span data-ar="المشتريات" data-en="Purchases">المشتريات</span></button>
-   <button data-page="shipments">▣ <span data-ar="شحنات الاستيراد" data-en="Import Shipments">شحنات الاستيراد</span></button>
-   <button data-page="customers">♙ <span data-ar="العملاء" data-en="Customers">العملاء</span></button>
-   <button data-page="suppliers">♧ <span data-ar="الموردون" data-en="Suppliers">الموردون</span></button>
-   <button data-page="accounts">＄ <span data-ar="الحسابات والخزينة" data-en="Accounts & Cashbox">الحسابات والخزينة</span></button>
-   <button data-page="reports">▤ <span data-ar="التقارير" data-en="Reports">التقارير</span></button>
-   <button data-page="settings">⚙ <span data-ar="الإعدادات" data-en="Settings">الإعدادات</span></button>
-  </nav>
- </aside>
- <main>
-  <div class="page-head"><div><h2 id="pageTitle">لوحة التحكم</h2><div class="muted" data-ar="نظرة عامة على نشاط Sunshine Import & Export" data-en="Overview of Sunshine Import & Export">نظرة عامة على نشاط Sunshine Import &amp; Export</div></div><span class="muted">EGP · USD · CNY</span></div>
-  <section id="dashboard">
-   <div class="stats">
-    <div class="card stat"><div class="label">● <span data-ar="قيمة المبيعات" data-en="Sales value">قيمة المبيعات</span></div><strong>— EGP</strong></div>
-    <div class="card stat"><div class="label">● <span data-ar="المشتريات" data-en="Purchases">المشتريات</span></div><strong>— EGP</strong></div>
-    <div class="card stat"><div class="label">● <span data-ar="عدد الأصناف" data-en="Items">عدد الأصناف</span></div><strong>—</strong></div>
-    <div class="card stat"><div class="label">● <span data-ar="رصيد العملاء" data-en="Customer balances">رصيد العملاء</span></div><strong>— EGP</strong></div>
-   </div>
-   <div class="card"><h3 data-ar="اختصارات سريعة" data-en="Quick actions">اختصارات سريعة</h3><div class="quick">
-    <button onclick="openPage('sales')" data-ar="+ فاتورة مبيعات" data-en="+ New sale">+ فاتورة مبيعات</button>
-    <button onclick="openPage('items')" data-ar="+ إضافة صنف" data-en="+ Add item">+ إضافة صنف</button>
-    <button onclick="openPage('shipments')" data-ar="+ شحنة استيراد" data-en="+ Import shipment">+ شحنة استيراد</button>
-   </div></div>
-   <div class="card"><h3 data-ar="ملخص النشاط" data-en="Activity summary">ملخص النشاط</h3><div class="placeholder" data-ar="سيظهر هنا ملخص المبيعات والمخزون والحسابات بعد توصيل الوحدات بقاعدة البيانات." data-en="Sales, inventory and account summaries will appear here after connecting the modules to the database.">سيظهر هنا ملخص المبيعات والمخزون والحسابات بعد توصيل الوحدات بقاعدة البيانات.</div></div>
-  </section>
-  <section id="module" class="card hidden"><h3 id="moduleTitle"></h3><div class="placeholder" id="moduleNote">هذه الوحدة جاهزة من ناحية التصميم، وسيتم توصيلها بقاعدة البيانات ومراجعة حقولها قبل إدخال أي بيانات.</div></section>
-  <div class="footer">MS ERP · Sunshine Import &amp; Export · <span data-ar="بدون ضريبة قيمة مضافة" data-en="No VAT">بدون ضريبة قيمة مضافة</span></div>
- </main>
-</div>
+:root{--p:#d41470;--pd:#a90d58;--soft:#fff0f6;--bg:#f7f7fb;--ink:#202438;--muted:#73788b;--line:#ece8ef}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Tahoma,sans-serif}button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:9px;padding:10px 15px;background:var(--p);color:#fff}input,select{width:100%;padding:11px;border:1px solid #d9d5df;border-radius:8px;background:#fff}header{background:linear-gradient(115deg,var(--pd),var(--p));color:#fff;padding:14px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.brand{display:flex;align-items:center;gap:12px}.brand img{width:52px;height:52px;object-fit:contain;background:#fff;border-radius:10px;padding:3px}.wrap{max-width:1400px;margin:22px auto;padding:0 16px}.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 6px 22px #24142d0a}.login{max-width:440px;margin:7vh auto}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}label{display:block;font-size:13px;margin:9px 0 5px;color:#555b6d}.muted{font-size:13px;color:var(--muted)}.msg{margin-top:10px;font-size:13px}.error{color:#a11}.ok{color:#16764e}nav{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:15px}nav button{background:var(--soft);color:var(--pd)}nav button.active{background:var(--p);color:white}.hidden{display:none!important}.layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px}.side{height:max-content;position:sticky;top:12px}.side button{display:block;width:100%;text-align:right;margin:4px 0;background:transparent;color:#444}.side button.active,.side button:hover{background:var(--soft);color:var(--pd)}table{width:100%;border-collapse:collapse;min-width:650px}th,td{text-align:right;padding:10px;border-bottom:1px solid var(--line);font-size:13px}th{background:#fff7fa}.scroll{overflow:auto}.secondary{background:#64748b}@media(max-width:800px){.layout{grid-template-columns:1fr}.side{position:static}.side nav{display:grid;grid-template-columns:repeat(2,1fr)}}
+</style></head><body>
+<header><div class="brand"><img src="sunshine-logo.png" alt="Sunshine"><div><b style="font-size:20px">MS ERP</b><div class="muted" style="color:#fff">Sunshine Import &amp; Export</div></div></div><div id="topuser" class="hidden"><span id="who"></span> <button class="secondary" onclick="logout()">تسجيل الخروج</button></div></header>
+<div class="wrap">
+<section id="setup" class="card"><h2>إعداد الاتصال بقاعدة البيانات</h2><p class="muted">استخدم Project URL ومفتاح Publishable فقط. لا تضع Secret أو service_role هنا.</p><div class="grid"><div><label>Supabase Project URL</label><input id="url" placeholder="https://xxxx.supabase.co"></div><div><label>Publishable key</label><input id="key" placeholder="sb_publishable_..."></div></div><button onclick="saveConfig()">حفظ الاتصال</button><p id="setupmsg" class="msg"></p></section>
+<section id="login" class="card login hidden"><h2 id="loginTitle">تسجيل دخول المدير</h2><label>نوع الحساب</label><select id="loginType" onchange="switchLogin()"><option value="admin">المدير - البريد الإلكتروني</option><option value="employee">الموظف - اسم المستخدم</option></select><div id="emailBox"><label>البريد الإلكتروني</label><input id="email" type="email" autocomplete="username"></div><div id="usernameBox" class="hidden"><label>اسم المستخدم</label><input id="username" autocomplete="username"></div><label>كلمة المرور</label><input id="password" type="password" autocomplete="current-password"><button onclick="login()">دخول</button><p id="loginmsg" class="msg"></p></section>
+<section id="application" class="hidden"><div class="layout"><aside class="card side"><b>القائمة الرئيسية</b><nav id="nav">
+<button class="active" onclick="openPage('dashboard',this)">لوحة التحكم</button><button onclick="openPage('items',this)">الأصناف والمخزون</button><button data-admin="1" onclick="openPage('shipments',this)">شحنات الاستيراد</button><button onclick="openPage('sales',this)">المبيعات</button><button onclick="openPage('purchases',this)">المشتريات</button><button onclick="openPage('customers',this)">العملاء</button><button onclick="openPage('suppliers',this)">الموردون</button><button onclick="openPage('accounts',this)">الحسابات والخزينة</button><button onclick="openPage('reports',this)">التقارير</button><button data-admin="1" onclick="openPage('settings',this)">إعدادات المدير</button></nav></aside><main><div class="card"><h2 id="pageTitle">لوحة التحكم</h2><p class="muted">العملة الأساسية EGP — العملات USD و CNY — بدون ضريبة قيمة مضافة</p></div>
+<div id="dashboard" class="card"><h3>مرحبًا بك في نظام Sunshine</h3><p class="muted">اختر القسم من القائمة.</p></div>
+<div id="items" class="card hidden"><h3>الأصناف والمخزون</h3><div class="grid"><div><label>اسم الصنف</label><input id="iname"></div><div><label>كود الصنف SKU</label><input id="isku"></div><div><label>كود إضافي</label><input id="icode"></div><div><label>الوحدة</label><input id="iunit" placeholder="قطعة / كرتونة / كيلو"></div><div><label>سعر الشراء</label><input id="ipurchase" type="number" min="0"></div><div><label>سعر البيع</label><input id="isale" type="number" min="0"></div><div><label>الرصيد الافتتاحي</label><input id="iqty" type="number" min="0" value="0"></div></div><button onclick="addItem()">حفظ الصنف</button><p id="itemmsg" class="msg"></p><div class="scroll"><table><thead><tr><th>SKU</th><th>الكود</th><th>الصنف</th><th>الوحدة</th><th>شراء</th><th>بيع</th><th>الرصيد</th></tr></thead><tbody id="itemrows"></tbody></table></div></div>
+<div id="shipments" class="card hidden"><h3>شحنات الاستيراد</h3><div class="grid"><div><label>اسم الشحنة</label><input id="sname"></div><div><label>تاريخ الوصول المتوقع</label><input id="arrival" type="date"></div><div><label>رقم الحاوية</label><input id="container"></div><div><label>رقم بوليصة الشحن</label><input id="bl"></div><div><label>قيمة الفاتورة</label><input id="invoice" type="number" min="0"></div><div><label>عملة الفاتورة</label><select id="currency"><option>USD</option><option>CNY</option><option>EGP</option></select></div><div><label>التكلفة النهائية بعد الجمارك (EGP)</label><input id="landed" type="number" min="0"></div></div><button onclick="addShipment()">حفظ الشحنة</button><p id="shipmsg" class="msg"></p><div class="scroll"><table><thead><tr><th>الشحنة</th><th>الوصول</th><th>الحاوية</th><th>البوليصة</th><th>الفاتورة</th><th>التكلفة EGP</th></tr></thead><tbody id="shiprows"></tbody></table></div></div>
+<div id="placeholder" class="card hidden"><h3 id="placeholderTitle"></h3><p class="muted">هذه الوحدة في مرحلة التوصيل بقاعدة البيانات.</p></div></main></div></section></div>
 <script>
-let language='ar';
-const names={dashboard:['لوحة التحكم','Dashboard'],items:['الأصناف والمخزون','Items & Inventory'],sales:['المبيعات','Sales'],purchases:['المشتريات','Purchases'],shipments:['شحنات الاستيراد','Import Shipments'],customers:['العملاء','Customers'],suppliers:['الموردون','Suppliers'],accounts:['الحسابات والخزينة','Accounts & Cashbox'],reports:['التقارير','Reports'],settings:['الإعدادات','Settings']};
-function openPage(id){document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));document.getElementById('dashboard').classList.toggle('hidden',id!=='dashboard');document.getElementById('module').classList.toggle('hidden',id==='dashboard');document.getElementById('pageTitle').textContent=names[id][language==='ar'?0:1];document.getElementById('moduleTitle').textContent=names[id][language==='ar'?0:1];}
-document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>openPage(b.dataset.page)));
-function toggleLanguage(){language=language==='ar'?'en':'ar';document.documentElement.lang=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';document.querySelectorAll('[data-ar]').forEach(e=>e.textContent=e.dataset[language]);document.getElementById('langBtn').textContent=language==='ar'?'English':'العربية';const active=document.querySelector('.nav button.active');openPage(active?active.dataset.page:'dashboard');}
-document.getElementById('today').textContent=new Date().toLocaleDateString('ar-EG');
-</script>
-</body>
-</html>
+let sb=null,role=null;const $=id=>document.getElementById(id);
+function saveConfig(){const u=$('url').value.trim(),k=$('key').value.trim();if(!u||!k){$('setupmsg').textContent='أدخل الرابط ومفتاح النشر العام';return}localStorage.setItem('sun_url',u);localStorage.setItem('sun_key',k);connect()}
+function connect(){const u=localStorage.getItem('sun_url'),k=localStorage.getItem('sun_key');if(!u||!k)return;$('url').value=u;$('key').value=k;sb=window.supabase.createClient(u,k);$('setup').classList.add('hidden');$('login').classList.remove('hidden');sb.auth.getSession().then(async({data})=>{if(data.session)await enterApp()})}
+function switchLogin(){const emp=$('loginType').value==='employee';$('emailBox').classList.toggle('hidden',emp);$('usernameBox').classList.toggle('hidden',!emp);$('loginTitle').textContent=emp?'تسجيل دخول الموظف':'تسجيل دخول المدير'}
+async function login(){const emp=$('loginType').value==='employee';const email=emp?$('username').value.trim().toLowerCase()+'@employees.sunshine-erp.invalid':$('email').value.trim();$('loginmsg').textContent='جارٍ التحقق...';const {error}=await sb.auth.signInWithPassword({email,password:$('password').value});if(error){$('loginmsg').textContent='بيانات الدخول غير صحيحة: '+error.message;$('loginmsg').className='msg error';return}await enterApp()}
+async function enterApp(){const {data:{user}}=await sb.auth.getUser();const {data,error}=await sb.rpc('current_user_role');if(error||!data){await sb.auth.signOut();$('loginmsg').textContent='لم يتم العثور على صلاحية لهذا الحساب. راجع user_roles.';return}role=data;$('who').textContent=user.email+' ('+(role==='admin'?'مدير':'موظف')+')';$('topuser').classList.remove('hidden');$('login').classList.add('hidden');$('application').classList.remove('hidden');document.querySelectorAll('[data-admin="1"]').forEach(b=>b.classList.toggle('hidden',role!=='admin'));await loadItems();if(role==='admin')await loadShipments()}
+async function logout(){await sb.auth.signOut();location.reload()}
+function openPage(id,btn){if(id==='shipments'&&role!=='admin'){alert('غير مسموح');return}document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');['dashboard','items','shipments','placeholder'].forEach(x=>$(x).classList.add('hidden'));$('pageTitle').textContent=btn.textContent.trim();if(['dashboard','items','shipments'].includes(id))$(id).classList.remove('hidden');else{$('placeholder').classList.remove('hidden');$('placeholderTitle').textContent=btn.textContent.trim()}}
+function msg(id,t,ok){$(id).textContent=t;$(id).className='msg '+(ok?'ok':'error')}
+async function addItem(){const row={name:$('iname').value.trim(),sku:$('isku').value.trim()||null,item_code:$('icode').value.trim()||null,unit:$('iunit').value.trim()||null,purchase_price:Number($('ipurchase').value||0),sale_price:Number($('isale').value||0),opening_quantity:Number($('iqty').value||0)};if(!row.name){msg('itemmsg','اكتب اسم الصنف',false);return}const {error}=await sb.from('items').insert(row);if(error){msg('itemmsg',error.message,false);return}msg('itemmsg','تم حفظ الصنف',true);['iname','isku','icode','iunit','ipurchase','isale'].forEach(x=>$(x).value='');$('iqty').value=0;loadItems()}
+async function loadItems(){const {data,error}=await sb.from('items').select('sku,item_code,name,unit,purchase_price,sale_price,opening_quantity').order('name');if(error){$('itemrows').innerHTML='<tr><td colspan="7">'+esc(error.message)+'</td></tr>';return}$('itemrows').innerHTML=(data||[]).map(x=>`<tr><td>${esc(x.sku)}</td><td>${esc(x.item_code)}</td><td>${esc(x.name)}</td><td>${esc(x.unit)}</td><td>${Number(x.purchase_price||0).toLocaleString()}</td><td>${Number(x.sale_price||0).toLocaleString()}</td><td>${Number(x.opening_quantity||0).toLocaleString()}</td></tr>`).join('')}
+async function addShipment(){const row={name:$('sname').value.trim(),expected_arrival:$('arrival').value||null,container_number:$('container').value.trim()||null,bl_number:$('bl').value.trim()||null,invoice_value:Number($('invoice').value||0),invoice_currency:$('currency').value,landed_cost_egp:Number($('landed').value||0)};if(!row.name){msg('shipmsg','اكتب اسم الشحنة',false);return}const {error}=await sb.from('import_shipments').insert(row);if(error){msg('shipmsg',error.message,false);return}msg('shipmsg','تم حفظ الشحنة بنجاح',true);['sname','arrival','container','bl','invoice','landed'].forEach(x=>$(x).value='');loadShipments()}
+async function loadShipments(){const {data,error}=await sb.from('import_shipments').select('name,expected_arrival,container_number,bl_number,invoice_value,invoice_currency,landed_cost_egp').order('created_at',{ascending:false});if(error){$('shiprows').innerHTML='<tr><td colspan="6">'+esc(error.message)+'</td></tr>';return}$('shiprows').innerHTML=(data||[]).map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.expected_arrival)}</td><td>${esc(x.container_number)}</td><td>${esc(x.bl_number)}</td><td>${Number(x.invoice_value||0).toLocaleString()} ${esc(x.invoice_currency)}</td><td>${Number(x.landed_cost_egp||0).toLocaleString()}</td></tr>`).join('')}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]))}
+if(localStorage.getItem('sun_url'))connect();
+</script></body></html>

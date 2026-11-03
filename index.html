@@ -6,9 +6,31 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{--p:#d41470;--pd:#a90d58;--soft:#fff0f6;--bg:#f7f7fb;--ink:#202438;--muted:#73788b;--line:#ece8ef}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Tahoma,sans-serif}button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:9px;padding:10px 15px;background:var(--p);color:#fff}input,select{width:100%;padding:11px;border:1px solid #d9d5df;border-radius:8px;background:#fff}header{background:linear-gradient(115deg,var(--pd),var(--p));color:#fff;padding:14px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.brand{display:flex;align-items:center;gap:12px}.brand img{width:52px;height:52px;object-fit:contain;background:#fff;border-radius:10px;padding:3px}.wrap{max-width:1400px;margin:22px auto;padding:0 16px}.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 6px 22px #24142d0a}.login{max-width:440px;margin:7vh auto}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}label{display:block;font-size:13px;margin:9px 0 5px;color:#555b6d}.muted{font-size:13px;color:var(--muted)}.msg{margin-top:10px;font-size:13px}.error{color:#a11}.ok{color:#16764e}nav{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:15px}nav button{background:var(--soft);color:var(--pd)}nav button.active{background:var(--p);color:white}.hidden{display:none!important}.layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px}.side{height:max-content;position:sticky;top:12px}.side button{display:block;width:100%;text-align:right;margin:4px 0;background:transparent;color:#444}.side button.active,.side button:hover{background:var(--soft);color:var(--pd)}table{width:100%;border-collapse:collapse;min-width:650px}th,td{text-align:right;padding:10px;border-bottom:1px solid var(--line);font-size:13px}th{background:#fff7fa}.scroll{overflow:auto}.secondary{background:#64748b}.danger{background:#b42318}.totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}.totalbox{background:#fff7fa;border:1px solid #f6d6e5;border-radius:10px;padding:12px}.totalbox b{display:block;font-size:18px;margin-top:5px}@media(max-width:800px){.layout{grid-template-columns:1fr}.side{position:static}.side nav{display:grid;grid-template-columns:repeat(2,1fr)}}@media print{header,.side,#nav,.no-print,#dashboard,#items,#shipments,#customers,#placeholder{display:none!important}body{background:white}.wrap{margin:0;padding:0}.layout{display:block}main>.card:first-child{display:none!important}#invoicePrint{display:block!important;border:0;box-shadow:none}}
-</style></head><body>
-<header><div class="brand"><img src="sunshine-logo.png" alt="Sunshine"><div><b style="font-size:20px">MS ERP</b><div style="color:white;font-size:13px">Sunshine Import &amp; Export</div></div></div><div id="topuser" class="hidden"><span id="who"></span> <button class="secondary" onclick="logout()">تسجيل الخروج</button></div></header>
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Tahoma,sans-serif}button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:9px;padding:10px 15px;background:var(--p);color:#fff}input,select{width:100%;padding:11px;border:1px solid #d9d5df;border-radius:8px;background:#fff}header{background:linear-gradient(115deg,var(--pd),var(--p));color:#fff;padding:14px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.brand{display:flex;align-items:center;gap:12px}.brand img{width:52px;height:52px;object-fit:contain;background:#fff;border-radius:10px;padding:3px}.wrap{max-width:1400px;margin:22px auto;padding:0 16px}.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 6px 22px #24142d0a}.login{max-width:440px;margin:7vh auto}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}label{display:block;font-size:13px;margin:9px 0 5px;color:#555b6d}.muted{font-size:13px;color:var(--muted)}.msg{margin-top:10px;font-size:13px}.error{color:#a11}.ok{color:#16764e}nav{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:15px}nav button{background:var(--soft);color:var(--pd)}nav button.active{background:var(--p);color:white}.hidden{display:none!important}.layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px}.side{height:max-content;position:sticky;top:12px}.side button{display:block;width:100%;text-align:right;margin:4px 0;background:transparent;color:#444}.side button.active,.side button:hover{background:var(--soft);color:var(--pd)}table{width:100%;border-collapse:collapse;min-width:650px}th,td{text-align:right;padding:10px;border-bottom:1px solid var(--line);font-size:13px}th{background:#fff7fa}.scroll{overflow:auto}.secondary{background:#64748b}.danger{background:#b42318}.totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}.totalbox{background:#fff7fa;border:1px solid #f6d6e5;border-radius:10px;padding:12px}.totalbox b{display:block;font-size:18px;margin-top:5px}@media(max-width:800px){.layout{grid-template-columns:1fr}.side{position:static}.side nav{display:grid;grid-template-columns:repeat(2,1fr)}}@media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  #invoicePrint,
+  #invoicePrint * {
+    visibility: visible !important;
+  }
+
+  #invoicePrint {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+}
 <div class="wrap">
 <section id="setup" class="card"><h2>إعداد الاتصال بقاعدة البيانات</h2><p class="muted">استخدم Project URL ومفتاح Publishable فقط. لا تضع Secret أو service_role هنا.</p><div class="grid"><div><label>Supabase Project URL</label><input id="url"></div><div><label>Publishable key</label><input id="key"></div></div><button onclick="saveConfig()">حفظ الاتصال</button><p id="setupmsg" class="msg"></p></section>
 <section id="login" class="card login hidden"><h2 id="loginTitle">تسجيل دخول المدير</h2><label>نوع الحساب</label><select id="loginType" onchange="switchLogin()"><option value="admin">المدير - البريد الإلكتروني</option><option value="employee">الموظف - اسم المستخدم</option></select><div id="emailBox"><label>البريد الإلكتروني</label><input id="email" type="email"></div><div id="usernameBox" class="hidden"><label>اسم المستخدم</label><input id="username"></div><label>كلمة المرور</label><input id="password" type="password"><button onclick="login()">دخول</button><p id="loginmsg" class="msg"></p></section>

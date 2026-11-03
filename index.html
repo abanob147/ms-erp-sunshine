@@ -30,12 +30,13 @@
 <div><label>العملة</label><select id="invCurrency"><option>EGP</option><option>USD</option><option>CNY</option></select></div>
 </div>
 <div class="scroll"><table id="invoiceTable"><thead><tr><th>الصنف / البيان</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th><th class="no-print">حذف</th></tr></thead><tbody id="invoiceRows"></tbody></table></div>
-<div class="invoice-actions no-print"><button type="button" onclick="addInvoiceRow()">إضافة صنف</button><button type="button" onclick="saveInvoice()">حفظ الفاتورة</button><button type="button" class="secondary" onclick="loadSalesArchive()">أرشيف الفواتير</button><button type="button" onclick="window.print()">طباعة الفاتورة</button></div><p id="salesmsg" class="msg no-print"></p><div id="salesArchive" class="no-print hidden"><h3>أرشيف الفواتير</h3><div class="scroll"><table><thead><tr><th>رقم الفاتورة</th><th>التاريخ</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>العملة</th></tr></thead><tbody id="archiveRows"></tbody></table></div></div>
+<div class="invoice-actions no-print"><button type="button" onclick="addInvoiceRow()">إضافة صنف</button><button type="button" onclick="saveInvoice()">حفظ الفاتورة</button><button type="button" class="secondary" onclick="loadSalesArchive()">أرشيف الفواتير</button><button type="button" onclick="window.print()">طباعة الفاتورة</button></div><p id="salesmsg" class="msg no-print"></p><div id="salesArchive" class="no-print hidden"><h3>أرشيف الفواتير</h3><div class="scroll"><table><thead><tr><th>رقم الفاتورة</th><th>اسم العميل</th><th>التاريخ</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>العملة</th><th>التفاصيل</th></tr></thead><tbody id="archiveRows"></tbody></table></div></div>
 <div class="invoice-total"><div><b>الإجمالي</b><strong id="invGrand">0.00</strong></div><div><b>المدفوع</b><input id="invPaid" type="number" min="0" value="0" oninput="calcInvoice()" style="max-width:140px"></div><div><b>المتبقي</b><strong id="invDue">0.00</strong></div></div><div style="margin-top:28px;border-top:1px solid #aaa;padding-top:10px;text-align:center">شكرًا لتعاملكم معنا</div>
-</div><p class="muted no-print">راجع الكميات والأسعار قبل الحفظ. لا يمكن تعديل الفاتورة بعد حفظها من هذه الشاشة.</p></div>
+</div><p class="muted no-print">راجع الأصناف والكميات والأسعار قبل الحفظ. الحفظ يخصم المخزون من قاعدة البيانات من خلال عملية واحدة.</p></div>
 <div id="placeholder" class="card hidden"><h3 id="placeholderTitle"></h3><p class="muted">هذه الوحدة في مرحلة التوصيل بقاعدة البيانات.</p></div></main></div></section></div>
 <script>
-let sb=null,role=null,itemsCache=[],customersCache=[];const $=id=>document.getElementById(id);
+let sb=null,role=null,itemsCache=[],customersCache=[],pendingSaleRequestId=null;const $=id=>document.getElementById(id);
+function newSaleRequestId(){if(window.crypto&&crypto.randomUUID)return crypto.randomUUID();return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==='x'?r:(r&3|8)).toString(16)})}
 function saveConfig(){const u=$('url').value.trim(),k=$('key').value.trim();if(!u||!k){$('setupmsg').textContent='أدخل الرابط ومفتاح النشر العام';return}localStorage.setItem('sun_url',u);localStorage.setItem('sun_key',k);connect()}
 function connect(){const u=localStorage.getItem('sun_url'),k=localStorage.getItem('sun_key');if(!u||!k)return;$('url').value=u;$('key').value=k;sb=window.supabase.createClient(u,k);$('setup').classList.add('hidden');$('login').classList.remove('hidden');sb.auth.getSession().then(async({data})=>{if(data.session)await enterApp()})}
 function switchLogin(){const emp=$('loginType').value==='employee';$('emailBox').classList.toggle('hidden',emp);$('usernameBox').classList.toggle('hidden',!emp);$('loginTitle').textContent=emp?'تسجيل دخول الموظف':'تسجيل دخول المدير'}
@@ -58,100 +59,63 @@ function calcInvoice(){let total=0;document.querySelectorAll('#invoiceRows tr').
 
 async function saveInvoice(){
   if(!sb){msg('salesmsg','اتصال قاعدة البيانات غير متاح',false);return}
-  const trs=[...document.querySelectorAll('#invoiceRows tr')];
-  if(!trs.length){msg('salesmsg','أضف صنفًا واحدًا على الأقل',false);return}
-  const lines=[];
-  for(const tr of trs){
-    const sel=tr.querySelector('.invoice-product');
-    const idx=sel.value===''?-1:Number(sel.value);
-    if(idx<0||!itemsCache[idx]){msg('salesmsg','اختر صنفًا من المخزون لكل سطر',false);return}
-    const item=itemsCache[idx], qty=Number(tr.querySelector('.qty').value), price=Number(tr.querySelector('.price').value);
-    if(!Number.isFinite(qty)||qty<=0||!Number.isFinite(price)||price<0){msg('salesmsg','راجع الكمية والسعر لكل صنف',false);return}
-    if(qty>Number(item.opening_quantity||0)){msg('salesmsg','الكمية المطلوبة أكبر من رصيد الصنف: '+item.name,false);return}
-    lines.push({item,qty,price,total:qty*price});
+  const button=[...document.querySelectorAll('.invoice-actions button')].find(b=>b.textContent.includes('حفظ الفاتورة'));
+  const rows=[...document.querySelectorAll('#invoiceRows tr')],lines=[];
+  if(!rows.length){msg('salesmsg','أضف صنفًا واحدًا على الأقل',false);return}
+  for(let i=0;i<rows.length;i++){
+    const tr=rows[i],selected=tr.querySelector('.invoice-product').value;
+    if(selected===''){msg('salesmsg','اختر صنفًا من المخزون في كل سطر',false);return}
+    const item=itemsCache[Number(selected)],quantity=Number(tr.querySelector('.qty').value||0),unitPrice=Number(tr.querySelector('.price').value||0);
+    if(!item||!Number.isFinite(Number(item.id))){msg('salesmsg','تعذر تحديد الصنف في السطر '+(i+1),false);return}
+    if(!(quantity>0)||!Number.isFinite(unitPrice)||unitPrice<0){msg('salesmsg','راجع الكمية والسعر في السطر '+(i+1),false);return}
+    lines.push({item_id:Number(item.id),quantity,unit_price:unitPrice});
   }
-  // Aggregate repeated lines so the stock check and deduction are accurate.
-  const totals=new Map();
-  for(const l of lines) totals.set(l.item.id,(totals.get(l.item.id)||0)+l.qty);
-  for(const [id,qty] of totals){
-    const item=itemsCache.find(x=>String(x.id)===String(id));
-    if(!item||qty>Number(item.opening_quantity||0)){msg('salesmsg','إجمالي الكمية المطلوبة يتجاوز رصيد أحد الأصناف',false);return}
-  }
-  const total=lines.reduce((a,l)=>a+l.total,0), paid=Number($('invPaid').value||0);
-  if(paid<0||paid>total){msg('salesmsg','قيمة المدفوع يجب أن تكون بين صفر وإجمالي الفاتورة',false);return}
-  const customerIndex=$('customerSelect').value;
-  const customer=customerIndex===''?null:customersCache[Number(customerIndex)];
-  const invoiceNo=$('invNo').value.trim();
+  const total=lines.reduce((sum,x)=>sum+x.quantity*x.unit_price,0),paid=Number($('invPaid').value||0),invoiceNo=$('invNo').value.trim();
   if(!invoiceNo){msg('salesmsg','اكتب رقم الفاتورة',false);return}
-  if(!confirm('تأكيد حفظ الفاتورة وخصم الكميات من المخزون؟'))return;
-  const saleRow={
-    invoice_number:invoiceNo,
-    customer_id:customer?.id??null,
-    invoice_date:$('invDate').value||new Date().toISOString().slice(0,10),
-    total_amount:total,
-    paid_amount:paid,
-    remaining_amount:total-paid,
-    currency:$('invCurrency').value,
-    discount_amount:0
-  };
-  msg('salesmsg','جارٍ حفظ الفاتورة...',true);
-  const {data:sale,error:saleError}=await sb.from('sales').insert(saleRow).select('id').single();
-  if(saleError){msg('salesmsg','لم تُحفظ الفاتورة: '+saleError.message,false);return}
-  const saleId=sale.id;
-  const saleLines=lines.map(l=>({sale_id:saleId,item_id:l.item.id,quantity:l.qty,unit_price:l.price,total:l.total}));
-  const {error:lineError}=await sb.from('sale_items').insert(saleLines);
-  if(lineError){
-    await sb.from('sales').delete().eq('id',saleId);
-    msg('salesmsg','فشل حفظ تفاصيل الفاتورة، وتمت محاولة إلغاء رأس الفاتورة: '+lineError.message,false);return
+  if(!Number.isFinite(paid)||paid<0||paid>total){msg('salesmsg','المدفوع يجب أن يكون بين صفر وإجمالي الفاتورة',false);return}
+  let customerId=null;
+  if($('customerSelect').value!==''){
+    const customer=customersCache[Number($('customerSelect').value)];
+    if(customer&&customer.id!==undefined&&customer.id!==null)customerId=Number(customer.id);
   }
-  const changed=[];
-  for(const [id,qty] of totals){
-    const item=itemsCache.find(x=>String(x.id)===String(id));
-    const newQty=Number(item.opening_quantity||0)-qty;
-    const {error:updateError}=await sb.from('items').update({opening_quantity:newQty}).eq('id',id);
-    if(updateError){
-      for(const old of changed) await sb.from('items').update({opening_quantity:old.quantity}).eq('id',old.id);
-      await sb.from('sale_items').delete().eq('sale_id',saleId);
-      await sb.from('sales').delete().eq('id',saleId);
-      msg('salesmsg','تعذر خصم المخزون؛ ألغيت محاولة الحفظ وأعدت الأرصدة السابقة قدر الإمكان: '+updateError.message,false);return
-    }
-    changed.push({id,quantity:Number(item.opening_quantity||0)});
-  }
-  msg('salesmsg','تم حفظ الفاتورة وخصم المخزون. رقم الفاتورة: '+invoiceNo,true);
-  await loadItems();
-  await loadSalesArchive();
-  $('invPaid').value=0;
-  $('invoiceRows').innerHTML='';
-  addInvoiceRow();
-  $('invNo').value='INV-'+Date.now().toString().slice(-8);
-  calcInvoice();
+  if(!pendingSaleRequestId)pendingSaleRequestId=newSaleRequestId();
+  if(button){button.disabled=true;button.textContent='جارٍ الحفظ...'}
+  msg('salesmsg','جارٍ حفظ الفاتورة وتحديث المخزون...',true);
+  try{
+    const {data,error}=await sb.rpc('save_sale_and_deduct_stock',{
+      p_invoice_number:invoiceNo,p_customer_id:customerId,
+      p_invoice_date:$('invDate').value||new Date().toISOString().slice(0,10),
+      p_total_amount:total,p_paid_amount:paid,p_currency:$('invCurrency').value,
+      p_discount_amount:0,p_exchange_rate:1,p_items:lines,p_request_id:pendingSaleRequestId
+    });
+    if(error)throw error;
+    pendingSaleRequestId=null;
+    msg('salesmsg','تم حفظ الفاتورة بنجاح وخصم المخزون. رقم السجل: '+data,true);
+    await loadItems();await loadSalesArchive();
+    $('invPaid').value='0';$('invoiceRows').innerHTML='';addInvoiceRow();
+    $('customerSelect').value='';$('invCustomer').value='';$('invPhone').value='';$('invAddress').value='';
+    $('invNo').value='INV-'+Date.now().toString().slice(-8);calcInvoice();
+  }catch(err){msg('salesmsg','لم يتم حفظ الفاتورة: '+(err.message||String(err))+' — لم يتم اعتماد خصم جزئي. يمكنك إعادة المحاولة بأمان.',false)}
+  finally{if(button){button.disabled=false;button.textContent='حفظ الفاتورة'}}
 }
 async function loadSalesArchive(){
   if(!sb)return;
   $('salesArchive').classList.remove('hidden');
-  $('archiveRows').innerHTML='<tr><td colspan="7">جارٍ التحميل...</td></tr>';
-  const {data,error}=await sb.from('sales').select('id,invoice_number,invoice_date,total_amount,paid_amount,remaining_amount,currency').order('invoice_date',{ascending:false}).limit(100);
-  if(error){$('archiveRows').innerHTML='<tr><td colspan="7">تعذر تحميل الأرشيف: '+esc(error.message)+'</td></tr>';return}
-  $('archiveRows').innerHTML=(data||[]).map(x=>`<tr><td>${esc(x.invoice_number)}</td><td>${esc(x.invoice_date)}</td><td>${Number(x.total_amount||0).toLocaleString()}</td><td>${Number(x.paid_amount||0).toLocaleString()}</td><td>${Number(x.remaining_amount||0).toLocaleString()}</td><td>${esc(x.currency)}</td><td><button type="button" class="secondary" onclick="restoreInvoice('${String(x.id).replace(/'/g,'')}')">عرض التفاصيل</button></td></tr>`).join('');
+  $('archiveRows').innerHTML='<tr><td colspan="8">جارٍ تحميل الأرشيف...</td></tr>';
+  const {data,error}=await sb.from('sales').select('id,invoice_number,customer_id,invoice_date,total_amount,paid_amount,remaining_amount,currency').order('invoice_date',{ascending:false}).limit(100);
+  if(error){$('archiveRows').innerHTML='<tr><td colspan="8">تعذر تحميل الأرشيف: '+esc(error.message)+'</td></tr>';return}
+  const customerNames=new Map(customersCache.map(c=>[String(c.id),c.name]));
+  $('archiveRows').innerHTML=(data||[]).map(x=>`<tr><td>${esc(x.invoice_number)}</td><td>${esc(customerNames.get(String(x.customer_id))||'غير محدد')}</td><td>${esc(x.invoice_date)}</td><td>${Number(x.total_amount||0).toLocaleString()}</td><td>${Number(x.paid_amount||0).toLocaleString()}</td><td>${Number(x.remaining_amount||0).toLocaleString()}</td><td>${esc(x.currency)}</td><td><button type="button" class="secondary" onclick="showSaleDetails('${String(x.id).replace(/'/g,'')}')">عرض</button></td></tr>`).join('')||'<tr><td colspan="8">لا توجد فواتير محفوظة.</td></tr>';
 }
-async function restoreInvoice(id){
-  const {data:sale,error}=await sb.from('sales').select('id,invoice_number,invoice_date,total_amount,paid_amount,remaining_amount,currency').eq('id',id).single();
+async function showSaleDetails(id){
+  const {data:sale,error}=await sb.from('sales').select('id,invoice_number,customer_id,invoice_date,total_amount,paid_amount,remaining_amount,currency').eq('id',id).single();
   if(error){msg('salesmsg','تعذر فتح الفاتورة: '+error.message,false);return}
-  const {data:rows,error:rowsError}=await sb.from('sale_items').select('item_id,quantity,unit_price,total').eq('sale_id',id);
-  if(rowsError){msg('salesmsg','تعذر تحميل تفاصيل الفاتورة: '+rowsError.message,false);return}
-  $('invNo').value=sale.invoice_number||'';
-  $('invDate').value=sale.invoice_date||'';
-  $('invCurrency').value=sale.currency||'EGP';
-  $('invPaid').value=Number(sale.paid_amount||0);
-  $('invoiceRows').innerHTML='';
-  for(const r of (rows||[])){
-    const tr=document.createElement('tr');
-    tr.innerHTML='<td><select class="invoice-product" disabled><option>الصنف المحفوظ</option></select></td><td><input class="qty" type="number" value="'+Number(r.quantity||0)+'" disabled></td><td><input class="price" type="number" value="'+Number(r.unit_price||0)+'" disabled></td><td class="line-total">'+Number(r.total||0).toFixed(2)+'</td><td class="no-print"></td>';
-    $('invoiceRows').appendChild(tr);
-  }
-  $('invGrand').textContent=Number(sale.total_amount||0).toFixed(2);
-  $('invDue').textContent=Number(sale.remaining_amount||0).toFixed(2);
-  msg('salesmsg','تم عرض بيانات الفاتورة المحفوظة. العرض فقط؛ لا تعدّلها من هنا.',true);
+  const {data:details,error:detailError}=await sb.from('sale_items').select('item_id,quantity,unit_price,total').eq('sale_id',id);
+  if(detailError){msg('salesmsg','تعذر تحميل تفاصيل الفاتورة: '+detailError.message,false);return}
+  const names=new Map(itemsCache.map(x=>[String(x.id),x.name]));
+  const lines=(details||[]).map(x=>`${names.get(String(x.item_id))||('صنف رقم '+x.item_id)} — كمية ${x.quantity} — سعر ${x.unit_price} — إجمالي ${x.total}`).join('\n');
+  const customerName=customersCache.find(c=>String(c.id)===String(sale.customer_id))?.name||'غير محدد';
+  alert(`فاتورة ${sale.invoice_number}\nالعميل: ${customerName}\nالتاريخ: ${sale.invoice_date}\nالإجمالي: ${sale.total_amount} ${sale.currency}\nالمدفوع: ${sale.paid_amount}\nالمتبقي: ${sale.remaining_amount}\n\n${lines}`);
 }
 
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}

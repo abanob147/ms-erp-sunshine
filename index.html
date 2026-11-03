@@ -1,80 +1,43 @@
-let editingCustomerId = null;
+<div id="customers" class="card hidden">
+<h3>العملاء</h3>
 
-async function addCustomer() {
-    const row = {
-        name: $('custName').value.trim(),
-        phone: $('custPhone').value.trim() || null,
-        address: $('custAddress').value.trim() || null
-    };
+<div class="grid">
+<div>
+<label>اسم العميل</label>
+<input id="custName">
+</div>
 
-    if (!row.name) {
-        msg('custmsg', 'اكتب اسم العميل أولاً', false);
-        return;
-    }
+<div>
+<label>رقم الهاتف</label>
+<input id="custPhone">
+</div>
 
-    let result;
+<div>
+<label>العنوان</label>
+<input id="custAddress">
+</div>
+</div>
 
-    if (editingCustomerId !== null) {
-        result = await sb
-            .from('customers')
-            .update(row)
-            .eq('id', editingCustomerId)
-            .select('id')
-            .maybeSingle();
+<button id="customerSaveBtn" onclick="saveCustomer()">حفظ العميل</button>
 
-        if (!result.data && !result.error) {
-            msg('custmsg', 'لم يتم العثور على العميل المطلوب تعديله', false);
-            return;
-        }
-    } else {
-        result = await sb
-            .from('customers')
-            .insert(row);
-    }
+<button id="customerCancelBtn" class="secondary hidden"
+onclick="cancelCustomerEdit()">إلغاء التعديل</button>
 
-    if (result.error) {
-        msg('custmsg', 'خطأ في الحفظ: ' + result.error.message, false);
-        return;
-    }
+<button class="secondary" onclick="loadCustomers()">تحديث القائمة</button>
 
-    msg(
-        'custmsg',
-        editingCustomerId !== null
-            ? 'تم تعديل بيانات العميل بنجاح'
-            : 'تم حفظ العميل بنجاح',
-        true
-    );
+<p id="custmsg" class="msg"></p>
 
-    cancelCustomerEdit();
-    await loadCustomers();
-}
-
-function editCustomer(id) {
-    const customer = customersCache.find(
-        c => String(c.id) === String(id)
-    );
-
-    if (!customer) return;
-
-    editingCustomerId = customer.id;
-
-    $('custName').value = customer.name || '';
-    $('custPhone').value = customer.phone || '';
-    $('custAddress').value = customer.address || '';
-
-    $('customerSaveBtn').textContent = 'حفظ التعديلات';
-    $('customerCancelBtn').classList.remove('hidden');
-
-    msg('custmsg', 'أنت الآن تعدل بيانات العميل', true);
-}
-
-function cancelCustomerEdit() {
-    editingCustomerId = null;
-
-    $('custName').value = '';
-    $('custPhone').value = '';
-    $('custAddress').value = '';
-
-    $('customerSaveBtn').textContent = 'حفظ العميل';
-    $('customerCancelBtn').classList.add('hidden');
-}
+<div class="scroll">
+<table>
+<thead>
+<tr>
+<th>الاسم</th>
+<th>الهاتف</th>
+<th>العنوان</th>
+<th>الإجراءات</th>
+</tr>
+</thead>
+<tbody id="custrows"></tbody>
+</table>
+</div>
+</div>

@@ -15,10 +15,10 @@
 <section id="setup" class="card"><h2>إعداد الاتصال بقاعدة البيانات</h2><p class="muted">أدخل رابط مشروع قاعدة البيانات ومفتاح النشر العام فقط. لا تضع المفتاح السري هنا.</p><div class="grid"><div><label>رابط مشروع قاعدة البيانات</label><input id="url" placeholder="رابط المشروع"></div><div><label>مفتاح النشر العام</label><input id="key" placeholder="مفتاح النشر العام"></div></div><button onclick="saveConfig()">حفظ الاتصال</button><p id="setupmsg" class="msg"></p></section>
 <section id="login" class="card login hidden"><h2 id="loginTitle">تسجيل دخول المدير</h2><label>نوع الحساب</label><select id="loginType" onchange="switchLogin()"><option value="admin">المدير - البريد الإلكتروني</option><option value="employee">الموظف - اسم المستخدم</option></select><div id="emailBox"><label>البريد الإلكتروني</label><input id="email" type="email" autocomplete="username"></div><div id="usernameBox" class="hidden"><label>اسم المستخدم</label><input id="username" autocomplete="username"></div><label>كلمة المرور</label><input id="password" type="password" autocomplete="current-password"><button onclick="login()">دخول</button><p id="loginmsg" class="msg"></p></section>
 <section id="application" class="hidden"><div class="layout"><aside class="card side"><b>القائمة الرئيسية</b><nav id="nav">
-<button class="active" onclick="openPage('dashboard',this)">لوحة التحكم</button><button onclick="openPage('items',this)">الأصناف والمخزون</button><button data-admin="1" onclick="openPage('shipments',this)">شحنات الاستيراد</button><button onclick="openPage('sales',this)">المبيعات</button><button onclick="openPage('customers',this)">العملاء</button><button onclick="openPage('purchases',this)">المشتريات</button><button onclick="openPage('suppliers',this)">الموردون</button><button onclick="openPage('accounts',this)">الحسابات والخزينة</button><button onclick="openPage('reports',this)">التقارير</button><button data-admin="1" onclick="openPage('settings',this)">إعدادات المدير</button></nav></aside><main><div class="card"><h2 id="pageTitle">لوحة التحكم</h2><p class="muted">العملة الأساسية الجنيه المصري — والعملتان الإضافيتان الدولار الأمريكي واليوان الصيني — بدون ضريبة قيمة مضافة</p></div>
+<button class="active" onclick="openPage('dashboard',this)">لوحة التحكم</button><button onclick="openPage('items',this)">الأصناف والمخزون</button><button data-admin="1" onclick="openPage('shipments',this)">شحنات الاستيراد</button><button onclick="openPage('sales',this)">المبيعات</button><button onclick="openPage('customers',this)">العملاء</button><button onclick="openPage('purchases',this)">المشتريات</button><button onclick="openPage('suppliers',this)">الموردون</button><button onclick="openPage('accounts',this)">الحسابات والخزينة</button><button onclick="openPage('reports',this)">التقارير</button><button data-admin="1" onclick="openPage('settings',this)">إعدادات المدير</button></nav></aside><main><div class="card"><h2 id="pageTitle">لوحة التحكم</h2><p class="muted">العملة المعتمدة: الجنيه المصري فقط — بدون ضريبة قيمة مضافة</p></div>
 <div id="dashboard" class="card"><h3>مرحبًا بك في نظام صن شاين</h3><p class="muted">اختر القسم من القائمة.</p></div>
 <div id="items" class="card hidden"><h3>الأصناف والمخزون</h3><div class="grid"><div><label>اسم الصنف</label><input id="iname"></div><div><label>كود الصنف</label><input id="isku"></div><div><label>كود إضافي</label><input id="icode"></div><div><label>الوحدة</label><input id="iunit" placeholder="قطعة / كرتونة / كيلو"></div><div><label>سعر الشراء</label><input id="ipurchase" type="number" min="0"></div><div><label>سعر البيع</label><input id="isale" type="number" min="0"></div><div><label>الرصيد الحالي</label><input id="iqty" type="number" min="0" value="0"></div></div><div class="invoice-actions"><button id="itemSaveBtn" onclick="addItem()">حفظ الصنف</button><button id="itemCancelBtn" class="secondary hidden" onclick="cancelItemEdit()">إلغاء التعديل</button></div><p id="itemmsg" class="msg"></p><div class="scroll"><table><thead><tr><th>كود الصنف</th><th>الكود</th><th>الصنف</th><th>الوحدة</th><th>شراء</th><th>بيع</th><th>الرصيد</th><th>الإجراءات</th></tr></thead><tbody id="itemrows"></tbody></table></div></div>
-<div id="shipments" class="card hidden"><h3>شحنات الاستيراد</h3><div class="grid"><div><label>اسم الشحنة</label><input id="sname"></div><div><label>تاريخ الوصول المتوقع</label><input id="arrival" type="date"></div><div><label>رقم الحاوية</label><input id="container"></div><div><label>رقم بوليصة الشحن</label><input id="bl"></div><div><label>قيمة الفاتورة</label><input id="invoice" type="number" min="0"></div><div><label>عملة الفاتورة</label><select id="currency"><option value="USD">دولار أمريكي</option><option value="CNY">يوان صيني</option><option value="EGP">جنيه مصري</option></select></div><div><label>التكلفة النهائية بعد الجمارك بالجنيه المصري</label><input id="landed" type="number" min="0"></div></div><button onclick="addShipment()">حفظ الشحنة</button><p id="shipmsg" class="msg"></p><div class="scroll"><table><thead><tr><th>الشحنة</th><th>الوصول</th><th>الحاوية</th><th>البوليصة</th><th>الفاتورة</th><th>التكلفة بالجنيه المصري</th></tr></thead><tbody id="shiprows"></tbody></table></div></div>
+<div id="shipments" class="card hidden"><h3>شحنات الاستيراد</h3><div class="grid"><div><label>اسم الشحنة</label><input id="sname"></div><div><label>تاريخ الوصول المتوقع</label><input id="arrival" type="date"></div><div><label>رقم الحاوية</label><input id="container"></div><div><label>رقم بوليصة الشحن</label><input id="bl"></div><div><label>قيمة الفاتورة</label><input id="invoice" type="number" min="0"></div><div><label>عملة الفاتورة</label><select id="currency"><option value="EGP">جنيه مصري</option></select></div><div><label>التكلفة النهائية بعد الجمارك بالجنيه المصري</label><input id="landed" type="number" min="0"></div></div><button onclick="addShipment()">حفظ الشحنة</button><p id="shipmsg" class="msg"></p><div class="scroll"><table><thead><tr><th>الشحنة</th><th>الوصول</th><th>الحاوية</th><th>البوليصة</th><th>الفاتورة</th><th>التكلفة بالجنيه المصري</th></tr></thead><tbody id="shiprows"></tbody></table></div></div>
 <div id="customers" class="card hidden"><h3>العملاء</h3><div class="grid"><div><label>اسم العميل</label><input id="custName"></div><div><label>رقم الهاتف</label><input id="custPhone"></div><div><label>العنوان</label><input id="custAddress"></div></div><button id="customerSaveBtn" onclick="addCustomer()">حفظ العميل</button><button id="customerCancelBtn" class="secondary hidden" onclick="cancelCustomerEdit()">إلغاء التعديل</button><button class="secondary" onclick="loadCustomers()">تحديث القائمة</button><p id="custmsg" class="msg"></p><div class="scroll"><table><thead><tr><th>الاسم</th><th>الهاتف</th><th>العنوان</th><th>الإجراءات</th></tr></thead><tbody id="custrows"></tbody></table></div></div>
 <div id="sales" class="card hidden"><div id="invoicePrint">
 <div class="invoice-head"><div><h2>صن شاين للاستيراد والتصدير</h2><div>فاتورة مبيعات</div><small>نظام إدارة صن شاين</small></div><div><b>رقم الفاتورة:</b> <input id="invNo" value="جارٍ التحميل..." readonly style="width:130px;background:#f3f4f6"><br><b>التاريخ:</b> <input id="invDate" type="date" style="width:150px"></div></div>
@@ -27,7 +27,7 @@
 <div><label>أو اسم العميل</label><input id="invCustomer" placeholder="اسم العميل"></div>
 <div><label>رقم الهاتف</label><input id="invPhone" placeholder="رقم الهاتف"></div>
 <div><label>العنوان</label><input id="invAddress" placeholder="عنوان العميل"></div>
-<div><label>العملة</label><select id="invCurrency"><option value="EGP">جنيه مصري</option><option value="USD">دولار أمريكي</option><option value="CNY">يوان صيني</option></select></div>
+<div><label>العملة</label><select id="invCurrency"><option value="EGP">جنيه مصري</option></select></div>
 </div>
 <div class="scroll"><table id="invoiceTable"><thead><tr><th>الصنف / البيان</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th><th class="no-print">حذف</th></tr></thead><tbody id="invoiceRows"></tbody></table></div>
 <div class="invoice-actions no-print"><button type="button" onclick="addInvoiceRow()">إضافة صنف</button><button type="button" onclick="saveInvoice()">حفظ الفاتورة</button><button type="button" style="background:#168b55" onclick="sendInvoiceWhatsApp()">إرسال الفاتورة عبر واتساب</button><button type="button" class="secondary" onclick="loadSalesArchive()">أرشيف الفواتير</button><button type="button" onclick="window.print()">طباعة الفاتورة</button></div><p id="salesmsg" class="msg no-print"></p><div id="salesArchive" class="no-print hidden"><h3>أرشيف الفواتير</h3><div class="scroll"><table><thead><tr><th>رقم الفاتورة</th><th>اسم العميل</th><th>التاريخ</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>العملة</th><th>التفاصيل</th></tr></thead><tbody id="archiveRows"></tbody></table></div></div>
@@ -148,4 +148,112 @@ async function showSaleDetails(id){
 
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem('sun_url'))connect();
-</script></body></html>
+</script>
+<style>
+#placeholder.finance-page{border-top:3px solid var(--p)}
+.finance-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:12px 0}
+.finance-stat{background:#fff7fa;border:1px solid #f5d7e5;border-radius:12px;padding:14px}
+.finance-stat b{display:block;color:#8e174e;font-size:13px}.finance-stat strong{display:block;font-size:22px;margin-top:8px}
+.finance-section{border:1px solid var(--line);border-radius:12px;padding:14px;margin:14px 0;background:#fff}
+.finance-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.finance-note{padding:10px;border-radius:9px;background:#f8fafc;color:#475569;font-size:13px;margin:10px 0}
+.finance-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.finance-table{overflow:auto}.finance-table table{min-width:700px}
+@media(max-width:600px){.finance-section{padding:10px}.finance-stat strong{font-size:19px}}
+</style>
+<script>
+/* وحدة الحسابات والخزينة — متوافقة مع schema SQL Sunshine */
+(function(){
+  const originalOpenPage=window.openPage;
+  let financeBanks=[], financeTx=[], financeCustomers=[], financeSettings=null;
+  const money=n=>Number(n||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2})+' جنيه';
+  const today=()=>new Date().toISOString().slice(0,10);
+  const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const el=id=>document.getElementById(id);
+  function financeMsg(id,text,ok){const n=el(id);if(n){n.textContent=text;n.className='msg '+(ok?'ok':'error')}}
+  function setPage(title,html){
+    document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));
+    const b=[...document.querySelectorAll('#nav button')].find(x=>x.textContent.trim()===title);if(b)b.classList.add('active');
+    ['dashboard','items','shipments','sales','customers','placeholder'].forEach(x=>{const n=el(x);if(n)n.classList.add('hidden')});
+    el('pageTitle').textContent=title;el('placeholder').classList.remove('hidden');el('placeholder').classList.add('finance-page');el('placeholder').innerHTML=html;
+  }
+  function accountLabel(type,id){if(type==='cash')return 'الخزينة النقدية';const b=financeBanks.find(x=>String(x.id)===String(id));return b?`${b.bank_name} — ${b.account_name||'بدون اسم'}`:'بنك غير محدد'}
+  function calcBalances(){
+    let cash=0;const bank=new Map(financeBanks.map(b=>[String(b.id),Number(b.opening_balance||0)]));
+    for(const t of financeTx){const amount=Number(t.amount||0);
+      if(t.kind==='transfer'){
+        if(t.account_type==='cash')cash-=amount;else bank.set(String(t.account_id),(bank.get(String(t.account_id))||0)-amount);
+        if(t.target_account_type==='cash')cash+=amount;else bank.set(String(t.target_account_id),(bank.get(String(t.target_account_id))||0)+amount);
+      }else{
+        const signed=t.kind==='receipt'?amount:-amount;
+        if(t.account_type==='cash')cash+=signed;else bank.set(String(t.account_id),(bank.get(String(t.account_id))||0)+signed);
+      }
+    }
+    return {cash,bank,total:cash+[...bank.values()].reduce((a,b)=>a+b,0)};
+  }
+  async function loadFinance(){
+    if(!window.sb)return;
+    const [b,t,c]=await Promise.all([
+      sb.from('bank_accounts').select('id,bank_name,account_name,account_number,opening_balance,is_active,created_at').order('bank_name'),
+      sb.from('sunshine_financial_transactions').select('id,kind,account_type,account_id,target_account_type,target_account_id,amount,customer_id,transaction_date,description,created_at').order('transaction_date',{ascending:false}).order('created_at',{ascending:false}).limit(500),
+      sb.from('customers').select('id,name').order('name')
+    ]);
+    if(b.error)throw b.error;if(t.error)throw t.error;
+    financeBanks=b.data||[];financeTx=t.data||[];financeCustomers=c.error?[]:(c.data||[]);
+  }
+  function financePageHtml(){
+    const bal=calcBalances();
+    const bankRows=financeBanks.map(b=>`<tr><td>${safe(b.bank_name)}</td><td>${safe(b.account_name||'')}</td><td>${safe(b.account_number||'')}</td><td>${money(b.opening_balance)}</td><td>${money(bal.bank.get(String(b.id))||0)}</td><td>${b.is_active?'نشط':'موقوف'}</td></tr>`).join('')||'<tr><td colspan="6">لا توجد حسابات بنكية حتى الآن.</td></tr>';
+    const custOpts=financeCustomers.map(c=>`<option value="${safe(c.id)}">${safe(c.name)}</option>`).join('');
+    const bankOpts=financeBanks.filter(b=>b.is_active).map(b=>`<option value="${safe(b.id)}">${safe(b.bank_name)} — ${safe(b.account_name||'')}</option>`).join('');
+    const txRows=financeTx.map(t=>{const kind=t.kind==='receipt'?'قبض':t.kind==='payment'?'صرف':'تحويل';const source=accountLabel(t.account_type,t.account_id);const target=t.kind==='transfer'?' ← '+accountLabel(t.target_account_type,t.target_account_id):'';const customer=financeCustomers.find(c=>String(c.id)===String(t.customer_id))?.name||'';return `<tr><td>${safe(t.transaction_date)}</td><td>${kind}</td><td>${safe(source+target)}</td><td>${money(t.amount)}</td><td>${safe(customer)}</td><td>${safe(t.description||'')}</td></tr>`}).join('')||'<tr><td colspan="6">لا توجد حركات مالية مسجلة.</td></tr>';
+    return `<h3>الحسابات والخزينة</h3><p class="muted">جميع المبالغ بالجنيه المصري فقط. الأرصدة محسوبة من الرصيد الافتتاحي للبنوك والحركات المسجلة في هذا الجدول.</p>
+      <div class="finance-stats"><div class="finance-stat"><b>رصيد الخزينة</b><strong>${money(bal.cash)}</strong></div><div class="finance-stat"><b>إجمالي أرصدة البنوك</b><strong>${money([...bal.bank.values()].reduce((a,b)=>a+b,0))}</strong></div><div class="finance-stat"><b>إجمالي النقدية والبنوك</b><strong>${money(bal.total)}</strong></div></div>
+      <div class="finance-section"><h3>تسجيل حركة مالية</h3><div class="finance-form">
+        <div><label>نوع الحركة</label><select id="finKind" onchange="financeToggleFields()"><option value="receipt">سند قبض</option><option value="payment">سند صرف</option><option value="transfer">تحويل بين الحسابات</option></select></div>
+        <div><label>الحساب ${'المصدر'}</label><select id="finSourceType" onchange="financeToggleFields()"><option value="cash">الخزينة النقدية</option><option value="bank">حساب بنكي</option></select></div>
+        <div id="finSourceBankBox" class="hidden"><label>البنك</label><select id="finSourceBank">${bankOpts}</select></div>
+        <div id="finTargetTypeBox" class="hidden"><label>الحساب المستهدف</label><select id="finTargetType" onchange="financeToggleFields()"><option value="cash">الخزينة النقدية</option><option value="bank">حساب بنكي</option></select></div>
+        <div id="finTargetBankBox" class="hidden"><label>البنك المستهدف</label><select id="finTargetBank">${bankOpts}</select></div>
+        <div><label>المبلغ بالجنيه المصري</label><input id="finAmount" type="number" min="0.01" step="0.01" placeholder="0.00"></div>
+        <div><label>التاريخ</label><input id="finDate" type="date" value="${today()}"></div>
+        <div id="finCustomerBox"><label>العميل (اختياري)</label><select id="finCustomer"><option value="">بدون عميل</option>${custOpts}</select></div>
+        <div><label>البيان</label><input id="finDescription" maxlength="500" placeholder="سبب الحركة أو ملاحظات"></div>
+      </div><div class="finance-actions"><button type="button" onclick="saveFinanceTransaction()">حفظ الحركة</button><button type="button" class="secondary" onclick="refreshFinancePage()">تحديث الأرصدة</button></div><p id="finMsg" class="msg"></p><div class="finance-note">تنبيه: التحويل يسجل حركة واحدة لها حساب مصدر وحساب مستهدف، ويؤثر على رصيدي الحسابين دون اعتباره إيراداً أو مصروفاً.</div></div>
+      <div class="finance-section"><h3>حسابات البنوك</h3>${role==='admin'?`<div class="finance-form"><div><label>اسم البنك</label><input id="newBankName"></div><div><label>اسم صاحب الحساب</label><input id="newBankOwner"></div><div><label>رقم الحساب</label><input id="newBankNumber"></div><div><label>الرصيد الافتتاحي بالجنيه</label><input id="newBankOpening" type="number" min="0" step="0.01" value="0"></div></div><div class="finance-actions"><button type="button" onclick="addFinanceBank()">إضافة حساب بنكي</button></div><p id="bankMsg" class="msg"></p>`:'<p class="muted">إضافة الحسابات البنكية متاحة للمدير فقط.</p>'}<div class="finance-table"><table><thead><tr><th>البنك</th><th>صاحب الحساب</th><th>رقم الحساب</th><th>الرصيد الافتتاحي</th><th>الرصيد الحالي</th><th>الحالة</th></tr></thead><tbody>${bankRows}</tbody></table></div></div>
+      <div class="finance-section"><h3>سجل الحركات المالية</h3><div class="finance-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الحساب</th><th>المبلغ</th><th>العميل</th><th>البيان</th></tr></thead><tbody>${txRows}</tbody></table></div></div>`;
+  }
+  window.financeToggleFields=function(){const kind=el('finKind')?.value,src=el('finSourceType')?.value,target=el('finTargetType')?.value;if(!kind)return;el('finSourceBankBox').classList.toggle('hidden',src!=='bank');el('finTargetTypeBox').classList.toggle('hidden',kind!=='transfer');el('finTargetBankBox').classList.toggle('hidden',kind!=='transfer'||target!=='bank');el('finCustomerBox').classList.toggle('hidden',kind==='transfer')};
+  window.refreshFinancePage=async function(){try{await loadFinance();setPage('الحسابات والخزينة',financePageHtml());financeToggleFields()}catch(e){alert('تعذر تحديث الحسابات والخزينة: '+e.message)}};
+  window.addFinanceBank=async function(){if(role!=='admin'){alert('إضافة البنوك متاحة للمدير فقط');return}const bank_name=el('newBankName').value.trim(),account_name=el('newBankOwner').value.trim()||null,account_number=el('newBankNumber').value.trim()||null,opening_balance=Number(el('newBankOpening').value||0);if(!bank_name||!Number.isFinite(opening_balance)||opening_balance<0){financeMsg('bankMsg','اكتب اسم البنك وتأكد من صحة الرصيد.',false);return}const {error}=await sb.from('bank_accounts').insert({bank_name,account_name,account_number,opening_balance,is_active:true});if(error){financeMsg('bankMsg','تعذر إضافة البنك: '+error.message,false);return}await refreshFinancePage();};
+  window.saveFinanceTransaction=async function(){
+    const kind=el('finKind').value,account_type=el('finSourceType').value,amount=Number(el('finAmount').value),transaction_date=el('finDate').value||today(),description=el('finDescription').value.trim()||null;
+    if(!Number.isFinite(amount)||amount<=0){financeMsg('finMsg','أدخل مبلغاً صحيحاً أكبر من صفر.',false);return}
+    const account_id=account_type==='bank'?Number(el('finSourceBank').value):null;if(account_type==='bank'&&!account_id){financeMsg('finMsg','أضف حساباً بنكياً أو اختر حساباً بنكياً.',false);return}
+    let target_account_type=null,target_account_id=null;
+    if(kind==='transfer'){target_account_type=el('finTargetType').value;target_account_id=target_account_type==='bank'?Number(el('finTargetBank').value):null;if(target_account_type==='bank'&&!target_account_id){financeMsg('finMsg','اختر البنك المستهدف.',false);return}if(account_type===target_account_type&&String(account_id||'cash')===String(target_account_id||'cash')){financeMsg('finMsg','لا يمكن التحويل إلى الحساب نفسه.',false);return}}
+    const customer_id=kind==='transfer'||!el('finCustomer').value?null:Number(el('finCustomer').value);
+    const {data:{user}}=await sb.auth.getUser();
+    const row={kind,account_type,account_id,target_account_type,target_account_id,amount,customer_id,transaction_date,description,created_by:user?.id||null};
+    const {error}=await sb.from('sunshine_financial_transactions').insert(row);if(error){financeMsg('finMsg','لم يتم حفظ الحركة: '+error.message,false);return}
+    await refreshFinancePage();
+  };
+  window.loadCompanySettings=async function(){
+    if(role!=='admin'){alert('إعدادات الشركة متاحة للمدير فقط');return}
+    const {data,error}=await sb.from('company_settings').select('id,company_name,phone,address').eq('id',1).maybeSingle();if(error){alert('تعذر تحميل الإعدادات: '+error.message);return}financeSettings=data||{id:1,company_name:'صن شاين للاستيراد والتصدير',phone:'',address:''};
+    setPage('إعدادات المدير',`<h3>إعدادات الشركة</h3><p class="muted">تُحفظ هذه البيانات في جدول إعدادات الشركة.</p><div class="finance-section"><div class="finance-form"><div><label>اسم الشركة</label><input id="companyName" value="${safe(financeSettings.company_name)}"></div><div><label>رقم الهاتف</label><input id="companyPhone" value="${safe(financeSettings.phone||'')}"></div><div><label>العنوان</label><input id="companyAddress" value="${safe(financeSettings.address||'')}"></div></div><div class="finance-actions"><button type="button" onclick="saveCompanySettings()">حفظ الإعدادات</button></div><p id="settingsMsg" class="msg"></p></div>`);
+  };
+  window.saveCompanySettings=async function(){const row={id:1,company_name:el('companyName').value.trim()||'صن شاين للاستيراد والتصدير',phone:el('companyPhone').value.trim()||null,address:el('companyAddress').value.trim()||null,updated_at:new Date().toISOString()};const {error}=await sb.from('company_settings').upsert(row,{onConflict:'id'});if(error){financeMsg('settingsMsg','تعذر حفظ الإعدادات: '+error.message,false);return}financeMsg('settingsMsg','تم حفظ إعدادات الشركة بنجاح.',true)};
+  window.openPage=function(id,btn){
+    if(id==='accounts'){if(!sb){alert('اتصال قاعدة البيانات غير متاح');return}if(btn){document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));btn.classList.add('active')}el('pageTitle').textContent='الحسابات والخزينة';el('placeholder').classList.remove('hidden');el('placeholder').classList.add('finance-page');el('placeholder').innerHTML='<h3>جارٍ تحميل الحسابات والخزينة...</h3>';loadFinance().then(()=>{el('placeholder').innerHTML=financePageHtml();financeToggleFields()}).catch(e=>{el('placeholder').innerHTML='<h3>تعذر تحميل الحسابات</h3><p class="error">'+safe(e.message)+'</p>'});['dashboard','items','shipments','sales','customers'].forEach(x=>el(x)?.classList.add('hidden'));return}
+    if(id==='settings'){if(role!=='admin'){alert('غير مسموح');return}if(btn){document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));btn.classList.add('active')}loadCompanySettings();['dashboard','items','shipments','sales','customers'].forEach(x=>el(x)?.classList.add('hidden'));return}
+    el('placeholder')?.classList.remove('finance-page');return originalOpenPage(id,btn);
+  };
+  const originalEnterApp=window.enterApp;
+  if(typeof originalEnterApp==='function'){
+    window.enterApp=async function(){await originalEnterApp();};
+  }
+})();
+</script>
+
+</body></html>

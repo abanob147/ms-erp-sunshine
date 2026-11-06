@@ -196,7 +196,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
     const [b,t,c]=await Promise.all([
       sb.from('bank_accounts').select('id,bank_name,account_name,account_number,opening_balance,is_active,created_at').order('bank_name'),
       sb.from('sunshine_financial_transactions').select('id,kind,account_type,account_id,target_account_type,target_account_id,amount,customer_id,transaction_date,description,created_at').order('transaction_date',{ascending:false}).order('created_at',{ascending:false}).limit(500),
-      sb.from('customers').select('id,name').order('name')
+      sb.from('customers').select('id,name,phone').order('name')
     ]);
     if(b.error)throw b.error;if(t.error)throw t.error;
     financeBanks=b.data||[];financeTx=t.data||[];financeCustomers=c.error?[]:(c.data||[]);
@@ -221,8 +221,59 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
         <div><label>البيان</label><input id="finDescription" maxlength="500" placeholder="سبب الحركة أو ملاحظات"></div>
       </div><div class="finance-actions"><button type="button" onclick="saveFinanceTransaction()">حفظ الحركة</button><button type="button" class="secondary" onclick="refreshFinancePage()">تحديث الأرصدة</button></div><p id="finMsg" class="msg"></p><div class="finance-note">تنبيه: التحويل يسجل حركة واحدة لها حساب مصدر وحساب مستهدف، ويؤثر على رصيدي الحسابين دون اعتباره إيراداً أو مصروفاً.</div></div>
       <div class="finance-section"><h3>حسابات البنوك</h3>${role==='admin'?`<div class="finance-form"><div><label>اسم البنك</label><input id="newBankName"></div><div><label>اسم صاحب الحساب</label><input id="newBankOwner"></div><div><label>رقم الحساب</label><input id="newBankNumber"></div><div><label>الرصيد الافتتاحي بالجنيه</label><input id="newBankOpening" type="number" min="0" step="0.01" value="0"></div></div><div class="finance-actions"><button type="button" onclick="addFinanceBank()">إضافة حساب بنكي</button></div><p id="bankMsg" class="msg"></p>`:'<p class="muted">إضافة الحسابات البنكية متاحة للمدير فقط.</p>'}<div class="finance-table"><table><thead><tr><th>البنك</th><th>صاحب الحساب</th><th>رقم الحساب</th><th>الرصيد الافتتاحي</th><th>الرصيد الحالي</th><th>الحالة</th></tr></thead><tbody>${bankRows}</tbody></table></div></div>
-      <div class="finance-section"><h3>سجل الحركات المالية</h3><div class="finance-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الحساب</th><th>المبلغ</th><th>العميل</th><th>البيان</th></tr></thead><tbody>${txRows}</tbody></table></div></div>`;
+      <div class="finance-section"><h3>سجل الحركات المالية</h3><div class="finance-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الحساب</th><th>المبلغ</th><th>العميل</th><th>البيان</th></tr></thead><tbody>${txRows}</tbody></table></div></div>
+      <div class="finance-section"><h3>كشف حساب عميل</h3><p class="muted">الكشف يعتمد على الحركات المحفوظة في جدول customer_transactions، مع رصيد متحرك ورصيد سابق للفترة.</p>
+        <div class="finance-form"><div><label>اختر العميل</label><select id="statementCustomer"><option value="">-- اختر العميل --</option>${custOpts}</select></div>
+        <div><label>من تاريخ</label><input id="statementFrom" type="date"></div><div><label>إلى تاريخ</label><input id="statementTo" type="date"></div></div>
+        <div class="finance-actions"><button type="button" onclick="loadCustomerStatement()">عرض كشف الحساب</button><button type="button" class="secondary" onclick="printCustomerStatement()">طباعة / حفظ PDF</button><button type="button" style="background:#168b55" onclick="sendCustomerStatementWhatsApp()">إرسال ملخص عبر واتساب</button></div>
+        <p id="statementMsg" class="msg"></p><div id="customerStatementPrint" class="hidden"><div class="invoice-head"><div><h2>صن شاين للاستيراد والتصدير</h2><b>كشف حساب عميل</b></div><div id="statementPrintMeta"></div></div><div id="statementSummary" class="finance-stats"></div><div class="finance-table"><table><thead><tr><th>التاريخ</th><th>البيان</th><th>رقم الفاتورة</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead><tbody id="statementRows"></tbody></table></div><p id="statementPrintFooter" class="muted"></p></div>
+      </div>`;
   }
+
+  let currentCustomerStatement=null;
+  window.loadCustomerStatement=async function(){
+    const customerId=el('statementCustomer')?.value;
+    if(!customerId){financeMsg('statementMsg','اختر العميل أولاً.',false);return}
+    const customer=financeCustomers.find(c=>String(c.id)===String(customerId));
+    if(!customer){financeMsg('statementMsg','لم يتم العثور على بيانات العميل.',false);return}
+    financeMsg('statementMsg','جارٍ تحميل كشف الحساب...',true);
+    const {data,error}=await sb.from('customer_transactions')
+      .select('id,customer_id,transaction_date,description,debit,credit,currency,sale_invoice_id')
+      .eq('customer_id',customerId)
+      .order('transaction_date',{ascending:true}).order('id',{ascending:true});
+    if(error){financeMsg('statementMsg','تعذر تحميل كشف الحساب: '+error.message,false);return}
+    const from=el('statementFrom').value||'',to=el('statementTo').value||'';
+    if(from&&to&&from>to){financeMsg('statementMsg','تاريخ البداية يجب أن يكون قبل تاريخ النهاية.',false);return}
+    const all=(data||[]).map(x=>({...x,debit:Number(x.debit||0),credit:Number(x.credit||0)}));
+    const saleIds=[...new Set(all.map(x=>x.sale_invoice_id).filter(Boolean))];
+    let invoiceNumbers=new Map();
+    if(saleIds.length){const sr=await sb.from('sales').select('id,invoice_number').in('id',saleIds);if(!sr.error)invoiceNumbers=new Map((sr.data||[]).map(x=>[String(x.id),x.invoice_number]));}
+    const opening=all.filter(x=>from&&x.transaction_date<from).reduce((a,x)=>a+x.debit-x.credit,0);
+    const shown=all.filter(x=>(!from||x.transaction_date>=from)&&(!to||x.transaction_date<=to));
+    let balance=opening;
+    const rows=shown.map(x=>{balance+=x.debit-x.credit;return {...x,balance}});
+    const totalDebit=shown.reduce((a,x)=>a+x.debit,0),totalCredit=shown.reduce((a,x)=>a+x.credit,0);
+    const fmt=n=>Number(n||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const body=rows.map(x=>`<tr><td>${safe(x.transaction_date||'')}</td><td>${safe(x.description||'')}</td><td>${x.sale_invoice_id?safe(invoiceNumbers.get(String(x.sale_invoice_id))||('#'+x.sale_invoice_id)):'—'}</td><td>${fmt(x.debit)}</td><td>${fmt(x.credit)}</td><td>${fmt(x.balance)}</td></tr>`).join('')||'<tr><td colspan="6">لا توجد حركات خلال الفترة المحددة.</td></tr>';
+    el('statementRows').innerHTML=body;
+    el('statementSummary').innerHTML=`<div class="finance-stat"><b>الرصيد السابق</b><strong>${fmt(opening)} جنيه</strong></div><div class="finance-stat"><b>إجمالي المدين</b><strong>${fmt(totalDebit)} جنيه</strong></div><div class="finance-stat"><b>إجمالي الدائن</b><strong>${fmt(totalCredit)} جنيه</strong></div><div class="finance-stat"><b>الرصيد النهائي</b><strong>${fmt(balance)} جنيه</strong></div>`;
+    el('statementPrintMeta').textContent='العميل: '+customer.name+' | الفترة: '+(from||'من البداية')+' إلى '+(to||'حتى الآن');
+    el('statementPrintFooter').textContent='الرصيد مدين إذا كان موجباً، ودائن إذا كان سالباً. جميع القيم بالجنيه المصري.';
+    el('customerStatementPrint').classList.remove('hidden');
+    currentCustomerStatement={customer,from,to,opening,totalDebit,totalCredit,balance,rows};
+    financeMsg('statementMsg','تم تحميل كشف حساب '+customer.name+' بنجاح.',true);
+  };
+  window.printCustomerStatement=function(){if(!currentCustomerStatement){alert('اعرض كشف الحساب أولاً.');return}document.body.classList.add('print-customer-statement');window.print();document.body.classList.remove('print-customer-statement')};
+  window.sendCustomerStatementWhatsApp=function(){
+    if(!currentCustomerStatement){alert('اعرض كشف الحساب أولاً.');return}
+    const {customer,from,to,opening,totalDebit,totalCredit,balance}=currentCustomerStatement;
+    let phone=String(customer.phone||'').replace(/[^0-9]/g,'');if(phone.startsWith('00'))phone=phone.slice(2);if(phone.startsWith('0'))phone='20'+phone.slice(1);
+    if(!phone){alert('لا يوجد رقم هاتف مسجل لهذا العميل. أضف رقم الهاتف في بيانات العميل أولاً.');return}
+    const fmt=n=>Number(n||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const message='كشف حساب من صن شاين للاستيراد والتصدير\nالعميل: '+customer.name+'\nالفترة: '+(from||'من البداية')+' إلى '+(to||'حتى الآن')+'\nالرصيد السابق: '+fmt(opening)+' جنيه\nإجمالي المدين: '+fmt(totalDebit)+' جنيه\nإجمالي الدائن: '+fmt(totalCredit)+' جنيه\nالرصيد النهائي: '+fmt(balance)+' جنيه\n\nيمكن طباعة الكشف وحفظه PDF من البرنامج.';
+    window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(message),'_blank','noopener');
+  };
+
   window.financeToggleFields=function(){const kind=el('finKind')?.value,src=el('finSourceType')?.value,target=el('finTargetType')?.value;if(!kind)return;el('finSourceBankBox').classList.toggle('hidden',src!=='bank');el('finTargetTypeBox').classList.toggle('hidden',kind!=='transfer');el('finTargetBankBox').classList.toggle('hidden',kind!=='transfer'||target!=='bank');el('finCustomerBox').classList.toggle('hidden',kind==='transfer')};
   window.refreshFinancePage=async function(){try{await loadFinance();setPage('الحسابات والخزينة',financePageHtml());financeToggleFields()}catch(e){alert('تعذر تحديث الحسابات والخزينة: '+e.message)}};
   window.addFinanceBank=async function(){if(role!=='admin'){alert('إضافة البنوك متاحة للمدير فقط');return}const bank_name=el('newBankName').value.trim(),account_name=el('newBankOwner').value.trim()||null,account_number=el('newBankNumber').value.trim()||null,opening_balance=Number(el('newBankOpening').value||0);if(!bank_name||!Number.isFinite(opening_balance)||opening_balance<0){financeMsg('bankMsg','اكتب اسم البنك وتأكد من صحة الرصيد.',false);return}const {error}=await sb.from('bank_accounts').insert({bank_name,account_name,account_number,opening_balance,is_active:true});if(error){financeMsg('bankMsg','تعذر إضافة البنك: '+error.message,false);return}await refreshFinancePage();};
@@ -255,5 +306,17 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
   }
 })();
 </script>
+
+
+<style>
+@media print {
+  body.print-customer-statement *{visibility:hidden!important}
+  body.print-customer-statement #invoicePrint,body.print-customer-statement #invoicePrint *{visibility:hidden!important}
+  body.print-customer-statement #customerStatementPrint,body.print-customer-statement #customerStatementPrint *{visibility:visible!important}
+  body.print-customer-statement #customerStatementPrint{display:block!important;position:absolute!important;top:0!important;right:0!important;width:100%!important;background:#fff!important;color:#000!important}
+  body.print-customer-statement #customerStatementPrint table{min-width:0!important;width:100%!important}
+  body.print-customer-statement #customerStatementPrint th,body.print-customer-statement #customerStatementPrint td{border:1px solid #777!important;color:#000!important}
+}
+</style>
 
 </body></html>

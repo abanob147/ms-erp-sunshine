@@ -304,7 +304,28 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
     setPage('إعدادات المدير',`<h3>إعدادات الشركة</h3><p class="muted">تُحفظ هذه البيانات في جدول إعدادات الشركة.</p><div class="finance-section"><div class="finance-form"><div><label>اسم الشركة</label><input id="companyName" value="${safe(financeSettings.company_name)}"></div><div><label>رقم الهاتف</label><input id="companyPhone" value="${safe(financeSettings.phone||'')}"></div><div><label>العنوان</label><input id="companyAddress" value="${safe(financeSettings.address||'')}"></div></div><div class="finance-actions"><button type="button" onclick="saveCompanySettings()">حفظ الإعدادات</button></div><p id="settingsMsg" class="msg"></p></div>`);
   };
   window.saveCompanySettings=async function(){const row={id:1,company_name:el('companyName').value.trim()||'صن شاين للاستيراد والتصدير',phone:el('companyPhone').value.trim()||null,address:el('companyAddress').value.trim()||null,updated_at:new Date().toISOString()};const {error}=await sb.from('company_settings').upsert(row,{onConflict:'id'});if(error){financeMsg('settingsMsg','تعذر حفظ الإعدادات: '+error.message,false);return}financeMsg('settingsMsg','تم حفظ إعدادات الشركة بنجاح.',true)};
+  window.loadSuppliers=async function(){
+    const host=el('supplierRows'); if(!host)return;
+    host.innerHTML='<tr><td colspan="4">جارٍ تحميل الموردين...</td></tr>';
+    const {data,error}=await sb.from('suppliers').select('id,name,phone,address,created_at').order('name',{ascending:true});
+    if(error){host.innerHTML='<tr><td colspan="4">تعذر تحميل الموردين: '+safe(error.message)+'</td></tr>';financeMsg('supplierMsg','راجع صلاحيات جدول suppliers (RLS): '+error.message,false);return}
+    host.innerHTML=(data||[]).map(x=>'<tr><td>'+safe(x.name)+'</td><td>'+safe(x.phone||'')+'</td><td>'+safe(x.address||'')+'</td><td><button type="button" class="secondary" onclick="editSupplier('+Number(x.id)+')">تعديل</button></td></tr>').join('')||'<tr><td colspan="4">لا يوجد موردون مسجلون حتى الآن.</td></tr>';
+    financeMsg('supplierMsg','عدد الموردين: '+(data||[]).length,true);
+  };
+  window.editSupplier=function(id){alert('للتعديل: سيتم تجهيز نموذج التعديل بعد التأكد من صلاحيات الجدول. رقم المورد: '+id)};
+  window.saveSupplier=async function(){
+    const name=el('supplierName').value.trim(),phone=el('supplierPhone').value.trim()||null,address=el('supplierAddress').value.trim()||null;
+    if(!name){financeMsg('supplierMsg','اكتب اسم المورد أولاً.',false);return}
+    const btn=el('supplierSaveBtn');if(btn){btn.disabled=true;btn.textContent='جارٍ الحفظ...'}
+    const {error}=await sb.from('suppliers').insert({name,phone,address});
+    if(btn){btn.disabled=false;btn.textContent='حفظ المورد'}
+    if(error){financeMsg('supplierMsg','تعذر حفظ المورد: '+error.message,false);return}
+    ['supplierName','supplierPhone','supplierAddress'].forEach(id=>el(id).value='');
+    financeMsg('supplierMsg','تم حفظ المورد بنجاح.',true);await loadSuppliers();
+  };
+  function suppliersPageHtml(){return '<h3>الموردون</h3><div class="finance-section"><h4>إضافة مورد جديد</h4><div class="finance-form"><div><label>اسم المورد *</label><input id="supplierName" placeholder="اسم المورد"></div><div><label>رقم الهاتف</label><input id="supplierPhone" placeholder="رقم الهاتف"></div><div><label>العنوان</label><input id="supplierAddress" placeholder="عنوان المورد"></div></div><div class="finance-actions"><button id="supplierSaveBtn" type="button" onclick="saveSupplier()">حفظ المورد</button><button class="secondary" type="button" onclick="loadSuppliers()">تحديث القائمة</button></div><p id="supplierMsg" class="msg"></p></div><div class="finance-section"><h4>قائمة الموردين</h4><div class="finance-table"><table><thead><tr><th>اسم المورد</th><th>الهاتف</th><th>العنوان</th><th>الإجراء</th></tr></thead><tbody id="supplierRows"><tr><td colspan="4">جارٍ التحميل...</td></tr></tbody></table></div></div>'}
   window.openPage=function(id,btn){
+    if(id==='suppliers'){if(!sb){alert('اتصال قاعدة البيانات غير متاح');return}document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');['dashboard','items','shipments','sales','customers'].forEach(x=>el(x)?.classList.add('hidden'));el('pageTitle').textContent='الموردون';el('placeholder').classList.remove('hidden');el('placeholder').classList.add('finance-page');el('placeholder').innerHTML=suppliersPageHtml();loadSuppliers();return}
     if(id==='accounts'){if(!sb){alert('اتصال قاعدة البيانات غير متاح');return}if(btn){document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));btn.classList.add('active')}el('pageTitle').textContent='الحسابات والخزينة';el('placeholder').classList.remove('hidden');el('placeholder').classList.add('finance-page');el('placeholder').innerHTML='<h3>جارٍ تحميل الحسابات والخزينة...</h3>';loadFinance().then(()=>{el('placeholder').innerHTML=financePageHtml();financeToggleFields()}).catch(e=>{el('placeholder').innerHTML='<h3>تعذر تحميل الحسابات</h3><p class="error">'+safe(e.message)+'</p>'});['dashboard','items','shipments','sales','customers'].forEach(x=>el(x)?.classList.add('hidden'));return}
     if(id==='settings'){if(role!=='admin'){alert('غير مسموح');return}if(btn){document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));btn.classList.add('active')}loadCompanySettings();['dashboard','items','shipments','sales','customers'].forEach(x=>el(x)?.classList.add('hidden'));return}
     el('placeholder')?.classList.remove('finance-page');return originalOpenPage(id,btn);

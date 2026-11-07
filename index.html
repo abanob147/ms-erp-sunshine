@@ -244,10 +244,19 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
     if(error){financeMsg('statementMsg','تعذر تحميل كشف الحساب: '+error.message,false);return}
     const from=el('statementFrom').value||'',to=el('statementTo').value||'';
     if(from&&to&&from>to){financeMsg('statementMsg','تاريخ البداية يجب أن يكون قبل تاريخ النهاية.',false);return}
-    const all=(data||[]).map(x=>({...x,debit:Number(x.debit||0),credit:Number(x.credit||0)}));
-    const saleIds=[...new Set(all.map(x=>x.sale_invoice_id).filter(Boolean))];
+    const raw=(data||[]).map(x=>({...x,debit:Number(x.debit||0),credit:Number(x.credit||0)}));
+    const saleIds=[...new Set(raw.map(x=>x.sale_invoice_id).filter(Boolean))];
     let invoiceNumbers=new Map();
-    if(saleIds.length){const sr=await sb.from('sales').select('id,invoice_number').in('id',saleIds);if(!sr.error)invoiceNumbers=new Map((sr.data||[]).map(x=>[String(x.id),x.invoice_number]));}
+    if(saleIds.length){const sr=await sb.from('sales').select('id,invoice_number').in('id',saleIds);if(!sr.error)invoiceNumbers=new Map((sr.data||[]).map(x=>[String(x.id),String(x.invoice_number||'')]));}
+    // منع تكرار الفاتورة في الكشف وفي إجمالي الرصيد، حتى لو اختلف نص البيان.
+    const seenInvoices=new Map(),all=[];
+    for(const x of raw){
+      const linked= x.sale_invoice_id ? invoiceNumbers.get(String(x.sale_invoice_id)) : '';
+      const match=String(x.description||'').match(/(?:INV|inv)[-\s/#]*[A-Z0-9-]+/i);
+      const invoiceNo=linked||match?.[0]?.replace(/\s+/g,'').toUpperCase()||'';
+      if(invoiceNo){const key=invoiceNo.toUpperCase();if(seenInvoices.has(key)){const i=seenInvoices.get(key);if(!all[i].sale_invoice_id&&x.sale_invoice_id)all[i]=x;continue;}seenInvoices.set(key,all.length);}
+      all.push(x);
+    }
     const opening=all.filter(x=>from&&x.transaction_date<from).reduce((a,x)=>a+x.debit-x.credit,0);
     const shown=all.filter(x=>(!from||x.transaction_date>=from)&&(!to||x.transaction_date<=to));
     let balance=opening;

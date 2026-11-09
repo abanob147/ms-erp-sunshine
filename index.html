@@ -272,7 +272,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
     if(!window.sb)return;
     const [b,t,c]=await Promise.all([
       sb.from('bank_accounts').select('id,bank_name,account_name,account_number,opening_balance,is_active,created_at').order('bank_name'),
-      sb.from('sunshine_financial_transactions').select('id,kind,account_type,account_id,target_account_type,target_account_id,amount,customer_id,transaction_date,description,created_at').order('transaction_date',{ascending:false}).order('created_at',{ascending:false}).limit(500),
+      sb.from('account_transactions').select('id,kind,account_type,account_id,target_account_type,target_account_id,amount,customer_id,transaction_date,description,created_at').order('transaction_date',{ascending:false}).order('created_at',{ascending:false}).limit(500),
       sb.from('customers').select('id,name,phone').order('name')
     ]);
     if(b.error)throw b.error;if(t.error)throw t.error;
@@ -315,23 +315,24 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
     if(!customer){financeMsg('statementMsg','لم يتم العثور على بيانات العميل.',false);return}
     financeMsg('statementMsg','جارٍ تحميل كشف الحساب...',true);
     const {data,error}=await sb.from('customer_transactions')
-      .select('id,customer_id,transaction_date,description,debit,credit,currency,sale_invoice_id')
+      .select('id,customer_id,transaction_date,description,debit,credit,currency,sale_invoice_id,sales_invoice_id')
       .eq('customer_id',customerId)
       .order('transaction_date',{ascending:true}).order('id',{ascending:true});
     if(error){financeMsg('statementMsg','تعذر تحميل كشف الحساب: '+error.message,false);return}
     const from=el('statementFrom').value||'',to=el('statementTo').value||'';
     if(from&&to&&from>to){financeMsg('statementMsg','تاريخ البداية يجب أن يكون قبل تاريخ النهاية.',false);return}
     const raw=(data||[]).map(x=>({...x,debit:Number(x.debit||0),credit:Number(x.credit||0)}));
-    const saleIds=[...new Set(raw.map(x=>x.sale_invoice_id).filter(Boolean))];
+    const saleIds=[...new Set(raw.flatMap(x=>[x.sale_invoice_id,x.sales_invoice_id]).filter(Boolean).map(String))];
     let invoiceNumbers=new Map();
     if(saleIds.length){const sr=await sb.from('sales').select('id,invoice_number').in('id',saleIds);if(!sr.error)invoiceNumbers=new Map((sr.data||[]).map(x=>[String(x.id),String(x.invoice_number||'')]));}
     // منع تكرار الفاتورة في الكشف وفي إجمالي الرصيد، حتى لو اختلف نص البيان.
     const seenInvoices=new Map(),all=[];
     for(const x of raw){
-      const linked= x.sale_invoice_id ? invoiceNumbers.get(String(x.sale_invoice_id)) : '';
+      const linkedId=x.sale_invoice_id||x.sales_invoice_id;
+      const linked=linkedId ? invoiceNumbers.get(String(linkedId)) : '';
       const match=String(x.description||'').match(/(?:INV|inv)[-\s/#]*[A-Z0-9-]+/i);
       const invoiceNo=linked||match?.[0]?.replace(/\s+/g,'').toUpperCase()||'';
-      if(invoiceNo){const key=invoiceNo.toUpperCase();if(seenInvoices.has(key)){const i=seenInvoices.get(key);if(!all[i].sale_invoice_id&&x.sale_invoice_id)all[i]=x;continue;}seenInvoices.set(key,all.length);}
+      if(invoiceNo){const key=invoiceNo.toUpperCase();if(seenInvoices.has(key)){const i=seenInvoices.get(key);if(!(all[i].sale_invoice_id||all[i].sales_invoice_id)&&linkedId)all[i]=x;continue;}seenInvoices.set(key,all.length);}
       all.push(x);
     }
     const opening=all.filter(x=>from&&x.transaction_date<from).reduce((a,x)=>a+x.debit-x.credit,0);
@@ -340,7 +341,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
     const rows=shown.map(x=>{balance+=x.debit-x.credit;return {...x,balance}});
     const totalDebit=shown.reduce((a,x)=>a+x.debit,0),totalCredit=shown.reduce((a,x)=>a+x.credit,0);
     const fmt=n=>Number(n||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2});
-    const body=rows.map(x=>`<tr><td>${safe(x.transaction_date||'')}</td><td>${safe(x.description||'')}</td><td>${x.sale_invoice_id?safe(invoiceNumbers.get(String(x.sale_invoice_id))||('#'+x.sale_invoice_id)):'—'}</td><td>${fmt(x.debit)}</td><td>${fmt(x.credit)}</td><td>${fmt(x.balance)}</td></tr>`).join('')||'<tr><td colspan="6">لا توجد حركات خلال الفترة المحددة.</td></tr>';
+    const body=rows.map(x=>{const invoiceId=x.sale_invoice_id||x.sales_invoice_id;return `<tr><td>${safe(x.transaction_date||'')}</td><td>${safe(x.description||'')}</td><td>${invoiceId?safe(invoiceNumbers.get(String(invoiceId))||('#'+invoiceId)):'—'}</td><td>${fmt(x.debit)}</td><td>${fmt(x.credit)}</td><td>${fmt(x.balance)}</td></tr>`}).join('')||'<tr><td colspan="6">لا توجد حركات خلال الفترة المحددة.</td></tr>';
     el('statementRows').innerHTML=body;
     el('statementSummary').innerHTML=`<div class="finance-stat"><b>الرصيد السابق</b><strong>${fmt(opening)} جنيه</strong></div><div class="finance-stat"><b>إجمالي المدين</b><strong>${fmt(totalDebit)} جنيه</strong></div><div class="finance-stat"><b>إجمالي الدائن</b><strong>${fmt(totalCredit)} جنيه</strong></div><div class="finance-stat"><b>الرصيد النهائي</b><strong>${fmt(balance)} جنيه</strong></div>`;
     el('statementPrintMeta').textContent='العميل: '+customer.name+' | الفترة: '+(from||'من البداية')+' إلى '+(to||'حتى الآن');
@@ -372,7 +373,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
     const customer_id=kind==='transfer'||!el('finCustomer').value?null:Number(el('finCustomer').value);
     const {data:{user}}=await sb.auth.getUser();
     const row={kind,account_type,account_id,target_account_type,target_account_id,amount,customer_id,transaction_date,description,created_by:user?.id||null};
-    const {error}=await sb.from('sunshine_financial_transactions').insert(row);if(error){financeMsg('finMsg','لم يتم حفظ الحركة: '+error.message,false);return}
+    if(kind==='receipt'&&customer_id){const {error}=await sb.rpc('record_customer_receipt',{p_customer_id:customer_id,p_amount:amount,p_date:transaction_date,p_description:description,p_account_type:account_type,p_account_id:account_id});if(error){financeMsg('finMsg','لم يتم حفظ سند القبض: '+error.message,false);return}}else{const {error}=await sb.from('account_transactions').insert(row);if(error){financeMsg('finMsg','لم يتم حفظ الحركة: '+error.message,false);return}}
     await refreshFinancePage();
   };
   window.loadCompanySettings=async function(){
@@ -452,6 +453,62 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
  window.purchaseLoadLedger=async function(){const id=Number($p('pLedgerSupplier').value);if(!id)return;const {data,error}=await sb.from('supplier_ledger').select('entry_date,entry_type,debit,credit,description').eq('supplier_id',id).order('entry_date');if(error){$p('pLedgerMsg').textContent=error.message;return}let bal=0;$p('pLedgerRows').innerHTML=(data||[]).map(x=>{bal+=Number(x.debit||0)-Number(x.credit||0);return `<tr><td>${safeP(x.entry_date)}</td><td>${safeP(x.description||x.entry_type)}</td><td>${Number(x.debit||0).toLocaleString()}</td><td>${Number(x.credit||0).toLocaleString()}</td><td>${bal.toLocaleString()}</td></tr>`}).join('')||'<tr><td colspan="5">لا توجد حركات.</td></tr>';};
  window.purchasePaySupplier=async function(){const id=Number($p('pLedgerSupplier').value),amount=Number($p('pPaymentAmount').value);if(!id||amount<=0){$p('pLedgerMsg').textContent='اختر المورد وأدخل مبلغًا صحيحًا';return}const {error}=await sb.rpc('record_supplier_payment',{p_supplier_id:id,p_amount:amount,p_date:new Date().toISOString().slice(0,10),p_description:$p('pPaymentDesc').value||'سند صرف للمورد'});$p('pLedgerMsg').textContent=error?'تعذر تسجيل الدفعة: '+error.message:'تم تسجيل الدفعة.';if(!error){$p('pPaymentAmount').value='';purchaseLoadLedger()}};
  window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'||!sb){alert('اتصال قاعدة البيانات غير متاح');return}document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');['dashboard','items','shipments','sales','customers'].forEach(x=>$p(x)?.classList.add('hidden'));$p('pageTitle').textContent='المشتريات';$p('placeholder').classList.remove('hidden');$p('placeholder').classList.add('finance-page');$p('placeholder').innerHTML=purchaseHtml();purchaseLoad();return}return oldOpen.call(this,id,btn)};
+})();
+</script>
+
+
+<script>
+/* Sunshine ERP completion layer: reports, employee administration and supplier editing. */
+(function(){
+ const $=id=>document.getElementById(id);
+ const escR=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const fmtR=v=>Number(v||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2});
+ const todayR=()=>new Date().toISOString().slice(0,10);
+ function page(title,html){document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.textContent.trim()===title));['dashboard','items','shipments','sales','customers'].forEach(id=>$(id)?.classList.add('hidden'));$('placeholder').classList.remove('hidden');$('placeholder').classList.add('finance-page');$('pageTitle').textContent=title;$('placeholder').innerHTML=html;}
+ async function reports(){
+  page('التقارير',`<h3>التقارير والإحصائيات</h3><div class="finance-section"><div class="finance-form"><div><label>من تاريخ</label><input id="rFrom" type="date" value="${new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().slice(0,10)}"></div><div><label>إلى تاريخ</label><input id="rTo" type="date" value="${todayR()}"></div></div><div class="finance-actions"><button onclick="sunshineRunReports()">عرض التقارير</button><button class="secondary" onclick="window.print()">طباعة التقرير</button></div><p id="rMsg" class="msg"></p></div><div id="rResults"></div>`);
+  await window.sunshineRunReports();
+ }
+ window.sunshineRunReports=async function(){
+  const from=$('rFrom')?.value||'',to=$('rTo')?.value||'';if(from&&to&&from>to){$('rMsg').textContent='تاريخ البداية بعد تاريخ النهاية.';return}
+  $('rMsg').textContent='جارٍ تحميل التقارير...';
+  const [sales,purchases,items,shipments]=await Promise.all([
+   sb.from('sales').select('id,invoice_number,invoice_date,total_amount,paid_amount,remaining_amount,currency,customer_id').gte('invoice_date',from||'1900-01-01').lte('invoice_date',to||'2999-12-31').order('invoice_date',{ascending:false}),
+   sb.from('purchases').select('id,invoice_number,purchase_date,total_amount,paid_amount,remaining_amount,supplier_id').gte('purchase_date',from||'1900-01-01').lte('purchase_date',to||'2999-12-31').order('purchase_date',{ascending:false}),
+   sb.from('items').select('id,name,sku,opening_quantity,purchase_price,sale_price').order('name'),
+   sb.from('import_shipments').select('id,name,expected_arrival,landed_cost_egp').order('expected_arrival',{ascending:true})
+  ]);
+  const err=[sales,purchases,items,shipments].find(x=>x.error);if(err){$('rMsg').textContent='تعذر تحميل التقارير: '+err.error.message;return}
+  const ss=sales.data||[],pp=purchases.data||[],ii=items.data||[],hh=shipments.data||[];
+  const sum=(a,k)=>a.reduce((n,x)=>n+Number(x[k]||0),0), salesTotal=sum(ss,'total_amount'),salesPaid=sum(ss,'paid_amount'),salesDue=sum(ss,'remaining_amount'),purchaseTotal=sum(pp,'total_amount'),purchasePaid=sum(pp,'paid_amount'),stockValue=ii.reduce((n,x)=>n+Number(x.opening_quantity||0)*Number(x.purchase_price||0),0);
+  const stat=(name,value)=>`<div class="finance-stat"><b>${name}</b><strong>${fmtR(value)} جنيه</strong></div>`;
+  $('rResults').innerHTML=`<div class="finance-stats">${stat('إجمالي المبيعات',salesTotal)}${stat('المحصل من المبيعات',salesPaid)}${stat('متبقي العملاء',salesDue)}${stat('إجمالي المشتريات',purchaseTotal)}${stat('المدفوع للموردين',purchasePaid)}${stat('قيمة المخزون التقديرية',stockValue)}</div>
+   <div class="finance-section"><h4>ملخص فواتير المبيعات (${ss.length})</h4><div class="finance-table"><table><thead><tr><th>الفاتورة</th><th>التاريخ</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th></tr></thead><tbody>${ss.map(x=>`<tr><td>${escR(x.invoice_number)}</td><td>${escR(x.invoice_date)}</td><td>${fmtR(x.total_amount)}</td><td>${fmtR(x.paid_amount)}</td><td>${fmtR(x.remaining_amount)}</td></tr>`).join('')||'<tr><td colspan="5">لا توجد فواتير خلال الفترة.</td></tr>'}</tbody></table></div></div>
+   <div class="finance-section"><h4>ملخص فواتير المشتريات (${pp.length})</h4><div class="finance-table"><table><thead><tr><th>الفاتورة</th><th>التاريخ</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th></tr></thead><tbody>${pp.map(x=>`<tr><td>${escR(x.invoice_number)}</td><td>${escR(x.purchase_date)}</td><td>${fmtR(x.total_amount)}</td><td>${fmtR(x.paid_amount)}</td><td>${fmtR(x.remaining_amount)}</td></tr>`).join('')||'<tr><td colspan="5">لا توجد فواتير خلال الفترة.</td></tr>'}</tbody></table></div></div>
+   <div class="finance-section"><h4>المخزون الحالي (${ii.length} صنف)</h4><div class="finance-table"><table><thead><tr><th>الصنف</th><th>الكود</th><th>الرصيد</th><th>سعر الشراء</th><th>قيمة الرصيد</th></tr></thead><tbody>${ii.map(x=>`<tr><td>${escR(x.name)}</td><td>${escR(x.sku||'')}</td><td>${fmtR(x.opening_quantity)}</td><td>${fmtR(x.purchase_price)}</td><td>${fmtR(Number(x.opening_quantity||0)*Number(x.purchase_price||0))}</td></tr>`).join('')}</tbody></table></div></div>
+   <div class="finance-section"><h4>شحنات الاستيراد</h4><div class="finance-table"><table><thead><tr><th>الشحنة</th><th>الوصول المتوقع</th><th>إجمالي التكلفة</th></tr></thead><tbody>${hh.map(x=>`<tr><td>${escR(x.name)}</td><td>${escR(x.expected_arrival||'')}</td><td>${fmtR(x.landed_cost_egp)} جنيه</td></tr>`).join('')||'<tr><td colspan="3">لا توجد شحنات.</td></tr>'}</tbody></table></div></div>`;
+  $('rMsg').textContent='تم تحميل التقارير. الأرقام محسوبة من السجلات المتاحة في قاعدة البيانات.';
+ };
+ const oldOpen=window.openPage;
+ window.openPage=function(id,btn){if(id==='reports'){if(role!=='admin'&&role!=='employee'){alert('غير مسموح');return}reports();return}return oldOpen.call(this,id,btn)};
+ // Employee creation must be performed by a server-side Edge Function using the service-role key.
+ const oldSettings=window.loadCompanySettings;
+ window.loadCompanySettings=async function(){await oldSettings();if(role!=='admin')return;
+  $('placeholder').insertAdjacentHTML('beforeend',`<div class="finance-section"><h3>إدارة حسابات الموظفين</h3><p class="finance-note">إنشاء حسابات الموظفين يتم بأمان من خلال Edge Function، ولا يتم وضع المفتاح السري داخل ملف HTML.</p><div class="finance-form"><div><label>اسم الموظف</label><input id="empName" autocomplete="off"></div><div><label>اسم المستخدم</label><input id="empUsername" autocomplete="off"></div><div><label>كلمة مرور مؤقتة (8 أحرف على الأقل)</label><input id="empPassword" type="password" autocomplete="new-password"></div></div><div class="finance-actions"><button type="button" onclick="sunshineCreateEmployee()">إنشاء حساب الموظف</button></div><p id="empMsg" class="msg"></p><p class="muted">بعد الإنشاء، يسجل الموظف الدخول من اختيار «الموظف - اسم المستخدم» في شاشة الدخول.</p></div>`);
+ };
+ window.sunshineCreateEmployee=async function(){
+  const name=$('empName').value.trim(),username=$('empUsername').value.trim().toLowerCase(),password=$('empPassword').value;
+  if(!name||!/^[a-z0-9._-]{3,30}$/.test(username)||password.length<8){$('empMsg').textContent='أدخل الاسم، واسم مستخدم من 3 إلى 30 حرفًا إنجليزيًا، وكلمة مرور 8 أحرف على الأقل.';return}
+  $('empMsg').textContent='جارٍ إنشاء الحساب...';
+  const {data,error}=await sb.functions.invoke('admin-create-employee',{body:{name,username,password}});
+  if(error||data?.error){$('empMsg').textContent='لم يتم إنشاء الحساب: '+(data?.error||error?.message||'خطأ غير معروف');return}
+  $('empMsg').textContent='تم إنشاء حساب الموظف بنجاح. اسم المستخدم: '+username;$('empName').value='';$('empUsername').value='';$('empPassword').value='';
+ };
+ // Supplier edit uses the same form and validates the update before saving.
+ let supplierEditingId=null;
+ const oldSupplierSave=window.saveSupplier;
+ window.editSupplier=async function(id){const {data,error}=await sb.from('suppliers').select('id,name,phone,address').eq('id',id).single();if(error){alert('تعذر تحميل المورد: '+error.message);return}supplierEditingId=data.id;$('supplierName').value=data.name||'';$('supplierPhone').value=data.phone||'';$('supplierAddress').value=data.address||'';$('supplierSaveBtn').textContent='حفظ التعديلات';$('supplierMsg').textContent='تعديل بيانات المورد: '+data.name;};
+ window.saveSupplier=async function(){if(supplierEditingId===null){return oldSupplierSave()};const row={name:$('supplierName').value.trim(),phone:$('supplierPhone').value.trim()||null,address:$('supplierAddress').value.trim()||null};if(!row.name){$('supplierMsg').textContent='اكتب اسم المورد أولاً.';return}const {error}=await sb.from('suppliers').update(row).eq('id',supplierEditingId);if(error){$('supplierMsg').textContent='تعذر تعديل المورد: '+error.message;return}supplierEditingId=null;['supplierName','supplierPhone','supplierAddress'].forEach(id=>$(id).value='');$('supplierSaveBtn').textContent='حفظ المورد';$('supplierMsg').textContent='تم تعديل بيانات المورد.';await loadSuppliers();};
 })();
 </script>
 

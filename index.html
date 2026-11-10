@@ -581,15 +581,35 @@ window.purchaseLoadLedger=async function(){const id=Number($p('pLedgerSupplier')
  // Employee creation must be performed by a server-side Edge Function using the service-role key.
  const oldSettings=window.loadCompanySettings;
  window.loadCompanySettings=async function(){await oldSettings();if(role!=='admin')return;
-  $('placeholder').insertAdjacentHTML('beforeend',`<div class="finance-section"><h3>إدارة حسابات الموظفين</h3><p class="finance-note">إنشاء حسابات الموظفين يتم بأمان من خلال Edge Function، ولا يتم وضع المفتاح السري داخل ملف HTML.</p><div class="finance-form"><div><label>اسم الموظف</label><input id="empName" autocomplete="off"></div><div><label>اسم المستخدم</label><input id="empUsername" autocomplete="off"></div><div><label>كلمة مرور مؤقتة (8 أحرف على الأقل)</label><input id="empPassword" type="password" autocomplete="new-password"></div></div><div class="finance-actions"><button type="button" onclick="sunshineCreateEmployee()">إنشاء حساب الموظف</button></div><p id="empMsg" class="msg"></p><p class="muted">بعد الإنشاء، يسجل الموظف الدخول من اختيار «الموظف - اسم المستخدم» في شاشة الدخول.</p></div>`);
+  $('placeholder').insertAdjacentHTML('beforeend',`<div class="finance-section"><h3>إدارة حسابات الموظفين</h3><p class="finance-note">إنشاء الحسابات وعرضها وحذفها متاح للمدير فقط. الحذف يزيل حساب دخول الموظف نهائيًا ولا يحذف فواتير أو حركاته التجارية.</p><div class="finance-form"><div><label>اسم الموظف</label><input id="empName" autocomplete="off"></div><div><label>اسم المستخدم</label><input id="empUsername" autocomplete="off"></div><div><label>كلمة مرور مؤقتة (8 أحرف على الأقل)</label><input id="empPassword" type="password" autocomplete="new-password"></div></div><div class="finance-actions"><button type="button" onclick="sunshineCreateEmployee()">إنشاء حساب الموظف</button><button type="button" class="secondary" onclick="sunshineLoadEmployees()">تحديث قائمة الموظفين</button></div><p id="empMsg" class="msg"></p><h4>حسابات الموظفين</h4><div class="scroll"><table><thead><tr><th>اسم الموظف</th><th>اسم المستخدم</th><th>الإجراء</th></tr></thead><tbody id="employeeRows"><tr><td colspan="3">جارٍ تحميل الحسابات...</td></tr></tbody></table></div><p class="muted">الحذف نهائي لحساب الدخول. تأكد من اختيار الموظف الصحيح قبل التأكيد.</p></div>`);
+  await sunshineLoadEmployees();
+ };
+ window.sunshineEmployeeApi=async function(action,userId=null){
+  const {data,error}=await sb.functions.invoke('admin-manage-employees',{body:{action,user_id:userId}});
+  if(error)throw new Error(error.message||'تعذر الاتصال بخدمة إدارة الموظفين');
+  if(data?.error)throw new Error(data.error);
+  return data;
+ };
+ window.sunshineLoadEmployees=async function(){
+  const tbody=$('employeeRows');if(!tbody||role!=='admin')return;
+  tbody.innerHTML='<tr><td colspan="3">جارٍ تحميل الحسابات...</td></tr>';
+  try{const data=await sunshineEmployeeApi('list');const rows=data.employees||[];
+   tbody.innerHTML=rows.length?rows.map(e=>`<tr><td>${String(e.name||'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</td><td>${String(e.username||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</td><td><button type="button" style="background:#b42318" onclick="sunshineDeleteEmployee('${e.user_id}')">مسح الحساب</button></td></tr>`).join(''):'<tr><td colspan="3">لا توجد حسابات موظفين.</td></tr>';
+  }catch(err){tbody.innerHTML=`<tr><td colspan="3">تعذر تحميل الحسابات: ${String(err.message||err)}</td></tr>`;}
+ };
+ window.sunshineDeleteEmployee=async function(userId){
+  if(role!=='admin'||!userId)return;
+  if(!confirm('هل أنت متأكد من مسح حساب هذا الموظف نهائيًا؟ لن يتم حذف فواتيره أو الحركات المسجلة باسمه.'))return;
+  const tbody=$('employeeRows');try{await sunshineEmployeeApi('delete',userId);$('empMsg').textContent='تم مسح حساب الموظف بنجاح.';$('empMsg').className='msg ok';await sunshineLoadEmployees();}
+  catch(err){$('empMsg').textContent='تعذر مسح الحساب: '+(err.message||err);$('empMsg').className='msg error';}
  };
  window.sunshineCreateEmployee=async function(){
   const name=$('empName').value.trim(),username=$('empUsername').value.trim().toLowerCase(),password=$('empPassword').value;
   if(!name||!/^[a-z0-9._-]{3,30}$/.test(username)||password.length<8){$('empMsg').textContent='أدخل الاسم، واسم مستخدم من 3 إلى 30 حرفًا إنجليزيًا، وكلمة مرور 8 أحرف على الأقل.';return}
-  $('empMsg').textContent='جارٍ إنشاء الحساب...';
+  $('empMsg').textContent='جارٍ إنشاء الحساب...';$('empMsg').className='msg';
   const {data,error}=await sb.functions.invoke('admin-create-employee',{body:{name,username,password}});
-  if(error||data?.error){$('empMsg').textContent='لم يتم إنشاء الحساب: '+(data?.error||error?.message||'خطأ غير معروف');return}
-  $('empMsg').textContent='تم إنشاء حساب الموظف بنجاح. اسم المستخدم: '+username;$('empName').value='';$('empUsername').value='';$('empPassword').value='';
+  if(error||data?.error){$('empMsg').textContent='لم يتم إنشاء الحساب: '+(data?.error||error?.message||'خطأ غير معروف');$('empMsg').className='msg error';return}
+  $('empMsg').textContent='تم إنشاء حساب الموظف بنجاح. اسم المستخدم: '+username;$('empMsg').className='msg ok';$('empName').value='';$('empUsername').value='';$('empPassword').value='';await sunshineLoadEmployees();
  };
  // Supplier edit uses the same form and validates the update before saving.
  let supplierEditingId=null;

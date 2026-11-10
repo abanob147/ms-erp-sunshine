@@ -215,7 +215,7 @@ async function loadSalesArchive(){
 async function showSaleDetails(id){
   const {data:sale,error}=await sb.from('sales').select('id,invoice_number,customer_id,invoice_date,total_amount,paid_amount,remaining_amount,currency').eq('id',id).single();
   if(error){msg('salesmsg','تعذر فتح الفاتورة: '+error.message,false);return}
-  const {data:details,error:detailError}=await sb.from('sale_items').select('item_id,quantity,unit_price,total').eq('sale_id',id);
+  const {data:details,error:detailError}=await sb.from('sale_items').select('item_id,quantity,unit_price,total,cost_price').eq('sale_id',id);
   if(detailError){msg('salesmsg','تعذر تحميل تفاصيل الفاتورة: '+detailError.message,false);return}
   const names=new Map(itemsCache.map(x=>[String(x.id),x.name]));
   const lines=(details||[]).map(x=>`${names.get(String(x.item_id))||('صنف رقم '+x.item_id)} — كمية ${x.quantity} — سعر ${x.unit_price} — إجمالي ${x.total}`).join('\n');
@@ -315,24 +315,24 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
     if(!customer){financeMsg('statementMsg','لم يتم العثور على بيانات العميل.',false);return}
     financeMsg('statementMsg','جارٍ تحميل كشف الحساب...',true);
     const {data,error}=await sb.from('customer_transactions')
-      .select('id,customer_id,transaction_date,description,debit,credit,currency,sale_invoice_id,sales_invoice_id')
+      .select('id,customer_id,transaction_date,description,debit,credit,currency,sale_invoice_id,financial_transaction_id')
       .eq('customer_id',customerId)
       .order('transaction_date',{ascending:true}).order('id',{ascending:true});
     if(error){financeMsg('statementMsg','تعذر تحميل كشف الحساب: '+error.message,false);return}
     const from=el('statementFrom').value||'',to=el('statementTo').value||'';
     if(from&&to&&from>to){financeMsg('statementMsg','تاريخ البداية يجب أن يكون قبل تاريخ النهاية.',false);return}
     const raw=(data||[]).map(x=>({...x,debit:Number(x.debit||0),credit:Number(x.credit||0)}));
-    const saleIds=[...new Set(raw.flatMap(x=>[x.sale_invoice_id,x.sales_invoice_id]).filter(Boolean).map(String))];
+    const saleIds=[...new Set(raw.map(x=>x.sale_invoice_id).filter(Boolean).map(String))];
     let invoiceNumbers=new Map();
     if(saleIds.length){const sr=await sb.from('sales').select('id,invoice_number').in('id',saleIds);if(!sr.error)invoiceNumbers=new Map((sr.data||[]).map(x=>[String(x.id),String(x.invoice_number||'')]));}
     // منع تكرار الفاتورة في الكشف وفي إجمالي الرصيد، حتى لو اختلف نص البيان.
     const seenInvoices=new Map(),all=[];
     for(const x of raw){
-      const linkedId=x.sale_invoice_id||x.sales_invoice_id;
+      const linkedId=x.sale_invoice_id;
       const linked=linkedId ? invoiceNumbers.get(String(linkedId)) : '';
       const match=String(x.description||'').match(/(?:INV|inv)[-\s/#]*[A-Z0-9-]+/i);
       const invoiceNo=linked||match?.[0]?.replace(/\s+/g,'').toUpperCase()||'';
-      if(invoiceNo){const key=invoiceNo.toUpperCase();if(seenInvoices.has(key)){const i=seenInvoices.get(key);if(!(all[i].sale_invoice_id||all[i].sales_invoice_id)&&linkedId)all[i]=x;continue;}seenInvoices.set(key,all.length);}
+      if(invoiceNo){const key=invoiceNo.toUpperCase();if(seenInvoices.has(key)){const i=seenInvoices.get(key);if(!all[i].sale_invoice_id&&linkedId)all[i]=x;continue;}seenInvoices.set(key,all.length);}
       all.push(x);
     }
     const opening=all.filter(x=>from&&x.transaction_date<from).reduce((a,x)=>a+x.debit-x.credit,0);
@@ -341,7 +341,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
     const rows=shown.map(x=>{balance+=x.debit-x.credit;return {...x,balance}});
     const totalDebit=shown.reduce((a,x)=>a+x.debit,0),totalCredit=shown.reduce((a,x)=>a+x.credit,0);
     const fmt=n=>Number(n||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2});
-    const body=rows.map(x=>{const invoiceId=x.sale_invoice_id||x.sales_invoice_id;return `<tr><td>${safe(x.transaction_date||'')}</td><td>${safe(x.description||'')}</td><td>${invoiceId?safe(invoiceNumbers.get(String(invoiceId))||('#'+invoiceId)):'—'}</td><td>${fmt(x.debit)}</td><td>${fmt(x.credit)}</td><td>${fmt(x.balance)}</td></tr>`}).join('')||'<tr><td colspan="6">لا توجد حركات خلال الفترة المحددة.</td></tr>';
+    const body=rows.map(x=>{const invoiceId=x.sale_invoice_id;return `<tr><td>${safe(x.transaction_date||'')}</td><td>${safe(x.description||'')}</td><td>${invoiceId?safe(invoiceNumbers.get(String(invoiceId))||('#'+invoiceId)):'—'}</td><td>${fmt(x.debit)}</td><td>${fmt(x.credit)}</td><td>${fmt(x.balance)}</td></tr>`}).join('')||'<tr><td colspan="6">لا توجد حركات خلال الفترة المحددة.</td></tr>';
     el('statementRows').innerHTML=body;
     el('statementSummary').innerHTML=`<div class="finance-stat"><b>الرصيد السابق</b><strong>${fmt(opening)} جنيه</strong></div><div class="finance-stat"><b>إجمالي المدين</b><strong>${fmt(totalDebit)} جنيه</strong></div><div class="finance-stat"><b>إجمالي الدائن</b><strong>${fmt(totalCredit)} جنيه</strong></div><div class="finance-stat"><b>الرصيد النهائي</b><strong>${fmt(balance)} جنيه</strong></div>`;
     el('statementPrintMeta').textContent='العميل: '+customer.name+' | الفترة: '+(from||'من البداية')+' إلى '+(to||'حتى الآن');
@@ -480,9 +480,11 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
   ]);
   const err=[sales,purchases,items,shipments].find(x=>x.error);if(err){$('rMsg').textContent='تعذر تحميل التقارير: '+err.error.message;return}
   const ss=sales.data||[],pp=purchases.data||[],ii=items.data||[],hh=shipments.data||[];
+  const saleIds=ss.map(x=>x.id);let soldLines=[];if(saleIds.length){const cr=await sb.from('sale_items').select('sale_id,quantity,unit_price,cost_price').in('sale_id',saleIds);if(cr.error){$('rMsg').textContent='تعذر تحميل تكلفة المبيعات: '+cr.error.message;return}soldLines=cr.data||[]}
+  const exactLines=soldLines.filter(x=>x.cost_price!==null&&x.cost_price!==undefined),profitRevenue=exactLines.reduce((n,x)=>n+Number(x.quantity||0)*Number(x.unit_price||0),0),profitCost=exactLines.reduce((n,x)=>n+Number(x.quantity||0)*Number(x.cost_price||0),0),grossProfit=profitRevenue-profitCost,missingCost=soldLines.length-exactLines.length;
   const sum=(a,k)=>a.reduce((n,x)=>n+Number(x[k]||0),0), salesTotal=sum(ss,'total_amount'),salesPaid=sum(ss,'paid_amount'),salesDue=sum(ss,'remaining_amount'),purchaseTotal=sum(pp,'total_amount'),purchasePaid=sum(pp,'paid_amount'),stockValue=ii.reduce((n,x)=>n+Number(x.opening_quantity||0)*Number(x.purchase_price||0),0);
   const stat=(name,value)=>`<div class="finance-stat"><b>${name}</b><strong>${fmtR(value)} جنيه</strong></div>`;
-  $('rResults').innerHTML=`<div class="finance-stats">${stat('إجمالي المبيعات',salesTotal)}${stat('المحصل من المبيعات',salesPaid)}${stat('متبقي العملاء',salesDue)}${stat('إجمالي المشتريات',purchaseTotal)}${stat('المدفوع للموردين',purchasePaid)}${stat('قيمة المخزون التقديرية',stockValue)}</div>
+  $('rResults').innerHTML=`<div class="finance-stats">${stat('إجمالي المبيعات',salesTotal)}${stat('المحصل من المبيعات',salesPaid)}${stat('متبقي العملاء',salesDue)}${stat('إجمالي المشتريات',purchaseTotal)}${stat('المدفوع للموردين',purchasePaid)}${stat('قيمة المخزون التقديرية',stockValue)}${stat('مجمل ربح الأصناف ذات التكلفة المسجلة',grossProfit)}</div><p class="finance-note">${missingCost?'تنبيه: توجد '+missingCost+' سطور بيع قديمة لا تتوفر لها تكلفة تاريخية؛ لم تُحتسب ضمن مجمل الربح.':'تم احتساب مجمل الربح من تكلفة الشراء المحفوظة وقت البيع. هذا مجمل ربح وليس صافي الربح بعد المصروفات.'}</p>
    <div class="finance-section"><h4>ملخص فواتير المبيعات (${ss.length})</h4><div class="finance-table"><table><thead><tr><th>الفاتورة</th><th>التاريخ</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th></tr></thead><tbody>${ss.map(x=>`<tr><td>${escR(x.invoice_number)}</td><td>${escR(x.invoice_date)}</td><td>${fmtR(x.total_amount)}</td><td>${fmtR(x.paid_amount)}</td><td>${fmtR(x.remaining_amount)}</td></tr>`).join('')||'<tr><td colspan="5">لا توجد فواتير خلال الفترة.</td></tr>'}</tbody></table></div></div>
    <div class="finance-section"><h4>ملخص فواتير المشتريات (${pp.length})</h4><div class="finance-table"><table><thead><tr><th>الفاتورة</th><th>التاريخ</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th></tr></thead><tbody>${pp.map(x=>`<tr><td>${escR(x.invoice_number)}</td><td>${escR(x.purchase_date)}</td><td>${fmtR(x.total_amount)}</td><td>${fmtR(x.paid_amount)}</td><td>${fmtR(x.remaining_amount)}</td></tr>`).join('')||'<tr><td colspan="5">لا توجد فواتير خلال الفترة.</td></tr>'}</tbody></table></div></div>
    <div class="finance-section"><h4>المخزون الحالي (${ii.length} صنف)</h4><div class="finance-table"><table><thead><tr><th>الصنف</th><th>الكود</th><th>الرصيد</th><th>سعر الشراء</th><th>قيمة الرصيد</th></tr></thead><tbody>${ii.map(x=>`<tr><td>${escR(x.name)}</td><td>${escR(x.sku||'')}</td><td>${fmtR(x.opening_quantity)}</td><td>${fmtR(x.purchase_price)}</td><td>${fmtR(Number(x.opening_quantity||0)*Number(x.purchase_price||0))}</td></tr>`).join('')}</tbody></table></div></div>

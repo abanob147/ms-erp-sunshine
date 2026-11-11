@@ -410,7 +410,20 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
   window.loadCompanySettings=async function(){
     if(role!=='admin'){alert('إعدادات الشركة متاحة للمدير فقط');return}
     const {data,error}=await sb.from('company_settings').select('id,company_name,phone,address').eq('id',1).maybeSingle();if(error){alert('تعذر تحميل الإعدادات: '+error.message);return}financeSettings=data||{id:1,company_name:'صن شاين للاستيراد والتصدير',phone:'',address:''};
-    setPage('إعدادات المدير',`<h3>إعدادات الشركة</h3><p class="muted">تُحفظ هذه البيانات في جدول إعدادات الشركة.</p><div class="finance-section"><div class="finance-form"><div><label>اسم الشركة</label><input id="companyName" value="${safe(financeSettings.company_name)}"></div><div><label>رقم الهاتف</label><input id="companyPhone" value="${safe(financeSettings.phone||'')}"></div><div><label>العنوان</label><input id="companyAddress" value="${safe(financeSettings.address||'')}"></div></div><div class="finance-actions"><button type="button" onclick="saveCompanySettings()">حفظ الإعدادات</button></div><p id="settingsMsg" class="msg"></p></div>`);
+    setPage('إعدادات المدير',`<h3>إعدادات الشركة</h3><p class="muted">تُحفظ هذه البيانات في جدول إعدادات الشركة.</p><div class="finance-section"><div class="finance-form"><div><label>اسم الشركة</label><input id="companyName" value="${safe(financeSettings.company_name)}"></div><div><label>رقم الهاتف</label><input id="companyPhone" value="${safe(financeSettings.phone||'')}"></div><div><label>العنوان</label><input id="companyAddress" value="${safe(financeSettings.address||'')}"></div></div><div class="finance-actions"><button type="button" onclick="saveCompanySettings()">حفظ الإعدادات</button></div><p id="settingsMsg" class="msg"></p></div><div class="finance-section" style="border:2px solid #a11;padding:16px;margin-top:18px"><h3 style="color:#a11">إعادة ضبط البرنامج بالكامل</h3><p>يمسح الفواتير والمخزون والشحنات والحسابات البنكية والخزينة والمصروفات وكشوف الحركات. يحتفظ بأسماء العملاء وأرقامهم وبيانات الموردين وأرقامهم، وحسابات الدخول وصلاحياتها وإعدادات الشركة.</p><p><b>تحذير: لا يمكن التراجع عن هذه العملية.</b></p><button type="button" style="background:#a11" onclick="adminFullReset()">إعادة ضبط البرنامج</button><p id="resetMsg" class="msg"></p></div>`);
+  };
+  window.adminFullReset=async function(){
+    if(role!=='admin'){alert('إعادة ضبط البرنامج متاحة للمدير فقط');return}
+    if(!confirm('تحذير نهائي: سيتم حذف جميع الفواتير والمخزون والشحنات والحركات المالية والمصروفات والحسابات البنكية. ستظل أسماء العملاء والموردين وأرقام هواتفهم محفوظة. هل تريد المتابعة؟'))return;
+    const phrase=prompt('للتأكيد النهائي اكتب العبارة التالية كما هي: RESET SUNSHINE');
+    if(phrase!=='RESET SUNSHINE'){alert('لم تتم إعادة الضبط. عبارة التأكيد غير مطابقة.');return}
+    const btn=document.querySelector('button[onclick=\"adminFullReset()\"]');if(btn){btn.disabled=true;btn.textContent='جارٍ إعادة الضبط...'}
+    const {data,error}=await sb.rpc('admin_reset_business_data');
+    if(btn){btn.disabled=false;btn.textContent='إعادة ضبط البرنامج'}
+    if(error){financeMsg('resetMsg','فشلت إعادة الضبط: '+error.message,false);return}
+    financeMsg('resetMsg','تمت إعادة ضبط بيانات التشغيل بنجاح. تم الاحتفاظ بالعملاء والموردين وحسابات الدخول.',true);
+    await loadItems();await loadCustomers();if(window.loadSuppliers)await window.loadSuppliers();if(window.loadFinance)await window.loadFinance();
+    alert('تمت إعادة ضبط البرنامج بنجاح.');
   };
   window.saveCompanySettings=async function(){const row={id:1,company_name:el('companyName').value.trim()||'صن شاين للاستيراد والتصدير',phone:el('companyPhone').value.trim()||null,address:el('companyAddress').value.trim()||null,updated_at:new Date().toISOString()};const {error}=await sb.from('company_settings').upsert(row,{onConflict:'id'});if(error){financeMsg('settingsMsg','تعذر حفظ الإعدادات: '+error.message,false);return}financeMsg('settingsMsg','تم حفظ إعدادات الشركة بنجاح.',true)};
   window.loadSuppliers=async function(){
@@ -418,7 +431,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
     host.innerHTML='<tr><td colspan="4">جارٍ تحميل الموردين...</td></tr>';
     const {data,error}=await sb.from('suppliers').select('id,name,phone,address,created_at').order('name',{ascending:true});
     if(error){host.innerHTML='<tr><td colspan="4">تعذر تحميل الموردين: '+safe(error.message)+'</td></tr>';financeMsg('supplierMsg','راجع صلاحيات جدول suppliers (RLS): '+error.message,false);return}
-    host.innerHTML=(data||[]).map(x=>'<tr><td>'+safe(x.name)+'</td><td>'+safe(x.phone||'')+'</td><td>'+safe(x.address||'')+'</td><td><button type="button" class="secondary" onclick="editSupplier('+Number(x.id)+')">تعديل</button> '+(role==='admin'?'<button type="button" style="background:#a11" onclick="deleteSupplier('+Number(x.id)+')">حذف</button>':'')+'</td></tr>').join('')||'<tr><td colspan="4">لا يوجد موردون مسجلون حتى الآن.</td></tr>';
+    host.innerHTML=(data||[]).map(x=>'<tr><td>'+safe(x.name)+'</td><td>'+safe(x.phone||'')+'</td><td>'+safe(x.address||'')+'</td><td><button type="button" class="secondary" onclick="editSupplier('+Number(x.id)+')">تعديل</button> ${role==='admin'?'<button type="button" style="background:#a11" onclick="deleteSupplier('+Number(x.id)+')">حذف</button>':''}</td></tr>').join('')||'<tr><td colspan="4">لا يوجد موردون مسجلون حتى الآن.</td></tr>';
     financeMsg('supplierMsg','عدد الموردين: '+(data||[]).length,true);
   };
   window.editSupplier=function(id){alert('للتعديل: سيتم تجهيز نموذج التعديل بعد التأكد من صلاحيات الجدول. رقم المورد: '+id)};
@@ -617,7 +630,6 @@ window.purchaseLoadLedger=async function(){const id=Number($p('pLedgerSupplier')
  // Supplier edit uses the same form and validates the update before saving.
  let supplierEditingId=null;
  const oldSupplierSave=window.saveSupplier;
- window.deleteSupplier=async function(id){if(role!=='admin'){alert('حذف الموردين متاح للمدير فقط');return}if(!confirm('هل تريد حذف هذا المورد؟ إذا كان مرتبطًا بفواتير أو حركات فقد تمنع قاعدة البيانات الحذف.'))return;const {error}=await sb.from('suppliers').delete().eq('id',id);if(error){$('supplierMsg').textContent='تعذر حذف المورد: '+error.message;$('supplierMsg').className='msg error';return}$('supplierMsg').textContent='تم حذف المورد.';$('supplierMsg').className='msg ok';await loadSuppliers()};
  window.editSupplier=async function(id){const {data,error}=await sb.from('suppliers').select('id,name,phone,address').eq('id',id).single();if(error){alert('تعذر تحميل المورد: '+error.message);return}supplierEditingId=data.id;$('supplierName').value=data.name||'';$('supplierPhone').value=data.phone||'';$('supplierAddress').value=data.address||'';$('supplierSaveBtn').textContent='حفظ التعديلات';$('supplierMsg').textContent='تعديل بيانات المورد: '+data.name;};
  window.saveSupplier=async function(){if(supplierEditingId===null){return oldSupplierSave()};const row={name:$('supplierName').value.trim(),phone:$('supplierPhone').value.trim()||null,address:$('supplierAddress').value.trim()||null};if(!row.name){$('supplierMsg').textContent='اكتب اسم المورد أولاً.';return}const {error}=await sb.from('suppliers').update(row).eq('id',supplierEditingId);if(error){$('supplierMsg').textContent='تعذر تعديل المورد: '+error.message;return}supplierEditingId=null;['supplierName','supplierPhone','supplierAddress'].forEach(id=>$(id).value='');$('supplierSaveBtn').textContent='حفظ المورد';$('supplierMsg').textContent='تم تعديل بيانات المورد.';await loadSuppliers();};
 })();

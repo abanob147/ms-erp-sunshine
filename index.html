@@ -431,7 +431,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
     host.innerHTML='<tr><td colspan="4">جارٍ تحميل الموردين...</td></tr>';
     const {data,error}=await sb.from('suppliers').select('id,name,phone,address,created_at').order('name',{ascending:true});
     if(error){host.innerHTML='<tr><td colspan="4">تعذر تحميل الموردين: '+safe(error.message)+'</td></tr>';financeMsg('supplierMsg','راجع صلاحيات جدول suppliers (RLS): '+error.message,false);return}
-    host.innerHTML=(data||[]).map(x=>'<tr><td>'+safe(x.name)+'</td><td>'+safe(x.phone||'')+'</td><td>'+safe(x.address||'')+'</td><td><button type="button" class="secondary" onclick="editSupplier('+Number(x.id)+')">تعديل</button> ${role==='admin'?'<button type="button" style="background:#a11" onclick="deleteSupplier('+Number(x.id)+')">حذف</button>':''}</td></tr>').join('')||'<tr><td colspan="4">لا يوجد موردون مسجلون حتى الآن.</td></tr>';
+    host.innerHTML=(data||[]).map(x=>`<tr><td>${safe(x.name)}</td><td>${safe(x.phone||'')}</td><td>${safe(x.address||'')}</td><td><button type="button" class="secondary" onclick="editSupplier(${Number(x.id)})">تعديل</button> ${role==='admin'?`<button type="button" style="background:#a11" onclick="deleteSupplier(${Number(x.id)})">حذف</button>`:''}</td></tr>`).join('')||'<tr><td colspan="4">لا يوجد موردون مسجلون حتى الآن.</td></tr>';
     financeMsg('supplierMsg','عدد الموردين: '+(data||[]).length,true);
   };
   window.editSupplier=function(id){alert('للتعديل: سيتم تجهيز نموذج التعديل بعد التأكد من صلاحيات الجدول. رقم المورد: '+id)};
@@ -593,7 +593,24 @@ window.purchaseLoadLedger=async function(){const id=Number($p('pLedgerSupplier')
   $('rMsg').textContent='تم تحميل التقارير. الأرقام محسوبة من السجلات المتاحة في قاعدة البيانات.';
  };
  const oldOpen=window.openPage;
- window.openPage=function(id,btn){if((id==='reports'||id==='purchases')&&role!=='admin'){alert(id==='reports'?'التقارير متاحة للمدير فقط':'فواتير المشتريات متاحة للمدير فقط');return}if(id==='reports'){reports();return}return oldOpen.call(this,id,btn)};
+ window.openPage=function(id,btn){
+  if((id==='reports'||id==='purchases'||id==='settings')&&role!=='admin'){alert('هذه الصفحة متاحة للمدير فقط');return}
+  if(id==='reports'){
+   // Render reports into the single content area; avoid stacking old report markup.
+   const host=$('placeholder'); if(host){host.innerHTML='';host.classList.remove('hidden');host.classList.add('finance-page');}
+   reports(); return;
+  }
+  if(id==='settings'){
+   // Explicitly route to manager settings instead of passing through older wrappers.
+   document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));
+   if(btn)btn.classList.add('active');
+   ['dashboard','items','shipments','sales','customers'].forEach(x=>$(x)?.classList.add('hidden'));
+   $('placeholder').classList.remove('hidden');$('placeholder').classList.add('finance-page');
+   $('placeholder').innerHTML='<h3>جارٍ تحميل إعدادات المدير...</h3>';
+   window.loadCompanySettings(); return;
+  }
+  return oldOpen.call(this,id,btn);
+ };
  // Employee creation must be performed by a server-side Edge Function using the service-role key.
  const oldSettings=window.loadCompanySettings;
  window.loadCompanySettings=async function(){await oldSettings();if(role!=='admin')return;

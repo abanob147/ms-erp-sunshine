@@ -556,11 +556,19 @@ window.purchaseLoadLedger=async function(){const id=Number($p('pLedgerSupplier')
   const from=$('rFrom')?.value||'',to=$('rTo')?.value||'';if(from&&to&&from>to){$('rMsg').textContent='تاريخ البداية بعد تاريخ النهاية.';return}
   $('rMsg').textContent='جارٍ تحميل التقارير...';
   if(role!=='admin'){
-   const {data,error}=await sb.from('operating_expenses').select('id,expense_date,category,description,amount').gte('expense_date',from||'1900-01-01').lte('expense_date',to||'2999-12-31').order('expense_date',{ascending:false});
-   if(error){$('rMsg').textContent='تعذر تحميل المصروفات: '+error.message;return}
-   const rows=data||[],total=rows.reduce((n,x)=>n+Number(x.amount||0),0);
-   $('rResults').innerHTML=`<div class="finance-stats"><div class="finance-stat"><b>إجمالي المصروفات</b><strong>${fmtR(total)} جنيه</strong></div><div class="finance-stat"><b>عدد المصروفات</b><strong>${rows.length}</strong></div></div><div class="finance-section"><h4>المصروفات المسجلة (${rows.length})</h4><div class="finance-table"><table><thead><tr><th>التاريخ</th><th>البند</th><th>البيان</th><th>القيمة</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${escR(x.expense_date)}</td><td>${escR(x.category)}</td><td>${escR(x.description||'')}</td><td>${fmtR(x.amount)} جنيه</td></tr>`).join('')||'<tr><td colspan="4">لا توجد مصروفات خلال الفترة.</td></tr>'}</tbody></table></div></div>`;
-   $('rMsg').textContent='تم تحميل المصروفات.';return;
+   const [salesResult,expensesResult]=await Promise.all([
+    sb.from('sales').select('id,total_amount,paid_amount,remaining_amount,invoice_date').gte('invoice_date',from||'1900-01-01').lte('invoice_date',to||'2999-12-31'),
+    sb.from('operating_expenses').select('id,expense_date,category,description,amount').gte('expense_date',from||'1900-01-01').lte('expense_date',to||'2999-12-31').order('expense_date',{ascending:false})
+   ]);
+   if(salesResult.error){$('rMsg').textContent='تعذر تحميل إجماليات المبيعات: '+salesResult.error.message;return}
+   if(expensesResult.error){$('rMsg').textContent='تعذر تحميل المصروفات: '+expensesResult.error.message;return}
+   const salesRows=salesResult.data||[],rows=expensesResult.data||[];
+   const totalSales=salesRows.reduce((n,x)=>n+Number(x.total_amount||0),0);
+   const collected=salesRows.reduce((n,x)=>n+Number(x.paid_amount||0),0);
+   const customerDue=salesRows.reduce((n,x)=>n+Number(x.remaining_amount??(Number(x.total_amount||0)-Number(x.paid_amount||0))),0);
+   const expenseTotal=rows.reduce((n,x)=>n+Number(x.amount||0),0);
+   $('rResults').innerHTML=`<div class="finance-stats"><div class="finance-stat"><b>إجمالي المبيعات</b><strong>${fmtR(totalSales)} جنيه</strong></div><div class="finance-stat"><b>المحصل من المبيعات</b><strong>${fmtR(collected)} جنيه</strong></div><div class="finance-stat"><b>متبقي العملاء</b><strong>${fmtR(customerDue)} جنيه</strong></div><div class="finance-stat"><b>إجمالي المصروفات</b><strong>${fmtR(expenseTotal)} جنيه</strong></div></div><div class="finance-section"><h4>المصروفات المسجلة (${rows.length})</h4><div class="finance-table"><table><thead><tr><th>التاريخ</th><th>البند</th><th>البيان</th><th>القيمة</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${escR(x.expense_date)}</td><td>${escR(x.category)}</td><td>${escR(x.description||'')}</td><td>${fmtR(x.amount)} جنيه</td></tr>`).join('')||'<tr><td colspan="4">لا توجد مصروفات خلال الفترة.</td></tr>'}</tbody></table></div></div>`;
+   $('rMsg').textContent='تم تحميل ملخص المبيعات والمصروفات. الأرباح غير متاحة لحساب الموظف.';return;
   }
   const [sales,purchases,items,shipments,expenses]=await Promise.all([
    sb.from('sales').select('id,invoice_number,invoice_date,total_amount,paid_amount,remaining_amount,currency,customer_id').gte('invoice_date',from||'1900-01-01').lte('invoice_date',to||'2999-12-31').order('invoice_date',{ascending:false}),

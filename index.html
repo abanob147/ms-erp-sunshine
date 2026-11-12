@@ -235,7 +235,10 @@ async function invoicePrintWindow(title, subtitle, rows, totals){
   let cfg=financeSettings;
   try{if(!cfg?.phone||!cfg?.address){const q=await sb.from('company_settings').select('company_name,phone,address').eq('id',1).maybeSingle();if(q.data)cfg=q.data}}catch(e){console.warn('تعذر تحميل بيانات الشركة للطباعة',e)}
   const contact=[cfg?.phone?'رقم الهاتف: '+cfg.phone:'',cfg?.address?'العنوان: '+cfg.address:'','العملة: جنيه مصري'].filter(Boolean).join(' | ');
-  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${escPrint(title)}</title><style>body{font-family:Arial,Tahoma,sans-serif;padding:28px;color:#222}h2{color:#a90d58;margin-bottom:5px}.print-brand{display:flex;align-items:center;gap:14px;border-bottom:2px solid #d41470;padding-bottom:12px}.print-brand img{width:260px;height:210px;object-fit:contain}.sub{color:#666;border-bottom:2px solid #d41470;padding-bottom:14px}table{width:100%;border-collapse:collapse;margin-top:22px}th,td{border:1px solid #aaa;padding:10px;text-align:right}th{background:#fceaf2}.totals{margin-top:20px;line-height:2;font-weight:bold}@media print{button{display:none}}</style></head><body><div class="print-brand"><img src="sunshine-logo.png" alt="شعار صن شاين"><div><h2>صن شاين للاستيراد والتصدير</h2><div>فاتورة مبيعات</div><div style="font-size:14px;line-height:1.9;margin-top:6px">${escPrint(contact)}</div></div></div><h3>${escPrint(title)}</h3><div class="sub">${escPrint(subtitle)}</div><table><thead><tr><th>الصنف</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${escPrint(r.name)}</td><td>${escPrint(r.qty)}</td><td>${escPrint(r.price)}</td><td>${escPrint(r.total)}</td></tr>`).join('')}</tbody></table><div class="totals">${totals.map(t=>`<div>${escPrint(t)}</div>`).join('')}</div><p style="margin-top:35px">شكراً لتعاملكم مع شركة صن شاين للاستيراد والتصدير</p><button onclick="window.print()">طباعة / حفظ PDF</button><script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script></body></html>`);
+  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${escPrint(title)}</title><style>body{font-family:Arial,Tahoma,sans-serif;padding:28px;color:#222}h2{color:#a90d58;margin-bottom:5px}.print-brand{display:flex;align-items:center;gap:14px;border-bottom:2px solid #d41470;padding-bottom:12px}.print-brand img{width:260px;height:210px;object-fit:contain}.sub{color:#666;border-bottom:2px solid #d41470;padding-bottom:14px}table{width:100%;border-collapse:collapse;margin-top:22px}th,td{border:1px solid #aaa;padding:10px;text-align:right}th{background:#fceaf2}.totals{margin-top:20px;line-height:2;font-weight:bold}@media print{button{display:none}}</style></head><body><div class="print-brand"><img src="sunshine-logo.png" alt="شعار صن شاين"><div><h2>صن شاين للاستيراد والتصدير</h2><div>فاتورة مبيعات</div><div style="font-size:14px;line-height:1.9;margin-top:6px">${escPrint(contact)}</div></div></div><h3>${escPrint(title)}</h3><div class="sub">${escPrint(subtitle)}</div><table><thead><tr><th>الصنف</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${escPrint(r.name)}</td><td>${escPrint(r.qty)}</td><td>${escPrint(r.price)}</td><td>${escPrint(r.total)}</td></tr>`).join('')}</tbody></table><div class="totals">${totals.map(t=>`<div>${escPrint(t)}</div>`).join('')}</div><p style="margin-top:35px">شكراً لتعاملكم مع شركة صن شاين للاستيراد والتصدير</p><button onclick="window.print()">طباعة / حفظ PDF</button><script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script>
+
+
+</body></html>`);
   w.document.close();
 }
 window.printArchivedSale=async function(id){
@@ -648,6 +651,57 @@ window.purchaseLoadLedger=async function(){const id=Number($p('pLedgerSupplier')
  const oldSupplierSave=window.saveSupplier;
  window.editSupplier=async function(id){const {data,error}=await sb.from('suppliers').select('id,name,phone,address').eq('id',id).single();if(error){alert('تعذر تحميل المورد: '+error.message);return}supplierEditingId=data.id;$('supplierName').value=data.name||'';$('supplierPhone').value=data.phone||'';$('supplierAddress').value=data.address||'';$('supplierSaveBtn').textContent='حفظ التعديلات';$('supplierMsg').textContent='تعديل بيانات المورد: '+data.name;};
  window.saveSupplier=async function(){if(supplierEditingId===null){return oldSupplierSave()};const row={name:$('supplierName').value.trim(),phone:$('supplierPhone').value.trim()||null,address:$('supplierAddress').value.trim()||null};if(!row.name){$('supplierMsg').textContent='اكتب اسم المورد أولاً.';return}const {error}=await sb.from('suppliers').update(row).eq('id',supplierEditingId);if(error){$('supplierMsg').textContent='تعذر تعديل المورد: '+error.message;return}supplierEditingId=null;['supplierName','supplierPhone','supplierAddress'].forEach(id=>$(id).value='');$('supplierSaveBtn').textContent='حفظ المورد';$('supplierMsg').textContent='تم تعديل بيانات المورد.';await loadSuppliers();};
+})();
+</script>
+
+
+<script>
+/* إعادة ضبط بيانات التشغيل — المدير فقط، مع الاحتفاظ بحسابات الدخول وإعدادات الشركة */
+(function(){
+  const $ = id => document.getElementById(id);
+  const previousLoadSettings = window.loadCompanySettings;
+  window.loadCompanySettings = async function(){
+    await previousLoadSettings();
+    if (role !== 'admin') return;
+    const host = $('placeholder');
+    if (!host || $('sunshineFullResetSection')) return;
+    host.insertAdjacentHTML('beforeend', `
+      <section id="sunshineFullResetSection" class="finance-section" style="border:2px solid #b42318;background:#fffafa">
+        <h3 style="color:#b42318">إعادة ضبط البرنامج بالكامل</h3>
+        <p class="finance-note">يحذف هذا الإجراء جميع بيانات التشغيل نهائياً: فواتير البيع والشراء، سندات القبض والصرف والتحويلات، كشوف العملاء والموردين، العملاء والموردين، الأصناف والمخزون، الشحنات، البنوك، المصروفات والتقارير الناتجة عنها.</p>
+        <p><b>لن يتم حذف:</b> حساب المدير، حسابات الموظفين، كلمات المرور، صلاحيات الدخول، إعدادات الشركة أو ملف الشعار.</p>
+        <p style="color:#b42318;font-weight:bold">تحذير: لا يمكن التراجع عن الحذف. صدّر نسخة احتياطية من قاعدة بيانات Supabase قبل المتابعة. هذا الزر لا ينشئ نسخة احتياطية تلقائياً.</p>
+        <div class="finance-actions"><button type="button" id="sunshineResetBtn" style="background:#b42318" onclick="adminFullReset()">إعادة ضبط جميع بيانات البرنامج</button></div>
+        <p id="resetMsg" class="msg" aria-live="polite"></p>
+      </section>`);
+  };
+
+  window.adminFullReset = async function(){
+    if (role !== 'admin' || !sb) { alert('إعادة الضبط متاحة للمدير فقط بعد تسجيل الدخول.'); return; }
+    const first = confirm('تحذير نهائي: سيتم حذف جميع فواتير البيع والشراء، والعملاء والموردين وكشوف الحسابات، والأصناف والمخزون، والشحنات، والبنوك، والسندات والمصروفات.\n\nسيتم الاحتفاظ بحساب المدير والموظفين وإعدادات الشركة والشعار.\n\nهل قمت بتصدير نسخة احتياطية وتريد المتابعة؟');
+    if (!first) return;
+    const phrase = prompt('للتأكيد النهائي اكتب العبارة التالية كما هي: RESET SUNSHINE');
+    if (phrase !== 'RESET SUNSHINE') { alert('لم تتم إعادة الضبط. عبارة التأكيد غير مطابقة.'); return; }
+    const btn = $('sunshineResetBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'جارٍ حذف البيانات...'; }
+    const msg = $('resetMsg');
+    if (msg) { msg.textContent = 'جارٍ تنفيذ إعادة الضبط بأمان...'; msg.className = 'msg'; }
+    try {
+      const {data,error} = await sb.rpc('admin_reset_business_data');
+      if (error) throw error;
+      if (!data || data.success !== true) throw new Error(data?.message || 'لم تؤكد قاعدة البيانات نجاح العملية.');
+      if (msg) { msg.textContent = 'تم حذف بيانات التشغيل بنجاح. حسابات الدخول وإعدادات الشركة والشعار ما زالت محفوظة.'; msg.className = 'msg ok'; }
+      await loadItems();
+      await loadCustomers();
+      if (window.loadNextInvoiceNumber) await loadNextInvoiceNumber();
+      if (window.loadSuppliers) await window.loadSuppliers();
+      alert('تمت إعادة ضبط بيانات التشغيل. يمكنك بدء التسجيل من جديد.');
+    } catch (e) {
+      if (msg) { msg.textContent = 'لم تكتمل إعادة الضبط: ' + (e.message || String(e)); msg.className = 'msg error'; }
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'إعادة ضبط جميع بيانات البرنامج'; }
+    }
+  };
 })();
 </script>
 

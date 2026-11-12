@@ -383,13 +383,13 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
     ]);
     if(b.error)throw b.error;if(t.error)throw t.error;
     financeBanks=b.data||[];financeTx=t.data||[];financeCustomers=c.error?[]:(c.data||[]);
-    const checks=await sb.from('company_checks').select('id,check_number,bank_name,drawer_name,amount,issue_date,collection_date,notes,image_data,status,created_at').order('collection_date',{ascending:true});
+    const checks=await sb.from('company_checks').select('id,check_number,bank_name,drawer_name,customer_id,amount,issue_date,collection_date,notes,image_data,status,created_at').order('collection_date',{ascending:true});
     if(checks.error){financeChecks=[];console.warn('تعذر تحميل الشيكات:',checks.error.message)}
     else financeChecks=checks.data||[];
     renderCheckAlertBadge();
   }
   function checkTableRows(){
-    return financeChecks.map(c=>`<tr><td>${safe(c.check_number)}</td><td>${safe(c.bank_name||'')}</td><td>${safe(c.drawer_name||'')}</td><td>${money(c.amount)}</td><td>${safe(c.issue_date||'')}</td><td>${safe(c.collection_date||'')}</td><td>${c.status==='collected'?'محصّل':'لم يتم التحصيل'}</td><td>${c.image_data?`<button type="button" class="secondary" onclick="showCheckImage('${String(c.id)}')">عرض الصورة</button>`:'لا توجد'}</td><td>${role==='admin'?`<button type="button" class="secondary" onclick="editCompanyCheck('${String(c.id)}')">تعديل</button> <button type="button" style="background:#a11" onclick="deleteCompanyCheck('${String(c.id)}')">حذف</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="9">لا توجد شيكات مسجلة.</td></tr>';
+    return financeChecks.map(c=>`<tr><td>${safe(c.check_number)}</td><td>${safe(c.bank_name||'')}</td><td>${safe(c.drawer_name||'')}</td><td>${safe(financeCustomers.find(x=>String(x.id)===String(c.customer_id))?.name||'—')}</td><td>${money(c.amount)}</td><td>${safe(c.issue_date||'')}</td><td>${safe(c.collection_date||'')}</td><td>${c.status==='collected'?'محصّل':'لم يتم التحصيل'}</td><td>${c.image_data?`<button type="button" class="secondary" onclick="showCheckImage('${String(c.id)}')">عرض الصورة</button>`:'لا توجد'}</td><td><button type="button" style="background:#168b55" onclick="sendCheckReminderWhatsApp('${String(c.id)}')">تذكير واتساب</button>${role==='admin'?` <button type="button" class="secondary" onclick="editCompanyCheck('${String(c.id)}')">تعديل</button> <button type="button" style="background:#a11" onclick="deleteCompanyCheck('${String(c.id)}')">حذف</button>`:''}</td></tr>`).join('')||'<tr><td colspan="10">لا توجد شيكات مسجلة.</td></tr>';
   }
   function renderCheckAlertBadge(){
     const todayDate=new Date();todayDate.setHours(0,0,0,0);
@@ -406,6 +406,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
         <div><label>رقم الشيك</label><input id="checkNumber" placeholder="رقم الشيك"></div>
         <div><label>اسم البنك</label><input id="checkBank" placeholder="اسم البنك"></div>
         <div><label>اسم صاحب الشيك / الساحب</label><input id="checkDrawer" placeholder="اسم صاحب الشيك"></div>
+        <div><label>العميل صاحب الشيك</label><select id="checkCustomer"><option value="">اختر العميل</option>${financeCustomers.map(c=>`<option value="${safe(c.id)}">${safe(c.name)}</option>`).join('')}</select></div>
         <div><label>قيمة الشيك بالجنيه المصري</label><input id="checkAmount" type="number" min="0.01" step="0.01"></div>
         <div><label>تاريخ إصدار الشيك</label><input id="checkIssueDate" type="date" value="${today()}"></div>
         <div><label>موعد التحصيل</label><input id="checkCollectionDate" type="date"></div>
@@ -414,7 +415,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
         <div style="grid-column:1/-1"><label>بيانات / ملاحظات الشيك</label><textarea id="checkNotes" rows="2" style="width:100%;padding:10px;border:1px solid #d9d5df;border-radius:8px"></textarea></div>
       </div><div class="finance-actions"><button type="button" onclick="saveCompanyCheck()">حفظ الشيك</button><button type="button" class="secondary" onclick="resetCheckForm()">تفريغ الحقول</button></div><p id="checkMsg" class="msg"></p></div>
       <div class="finance-section"><h4>قائمة الشيكات المسجلة</h4><div id="checkAlertsBox" class="finance-note hidden" role="status"></div>
-        <div class="finance-table"><table><thead><tr><th>رقم الشيك</th><th>البنك</th><th>الساحب</th><th>القيمة</th><th>تاريخ الإصدار</th><th>موعد التحصيل</th><th>الحالة</th><th>الصورة</th><th>الإجراءات</th></tr></thead><tbody>${checkTableRows()}</tbody></table></div></div>`;
+        <div class="finance-table"><table><thead><tr><th>رقم الشيك</th><th>البنك</th><th>الساحب</th><th>العميل صاحب الشيك</th><th>القيمة</th><th>تاريخ الإصدار</th><th>موعد التحصيل</th><th>الحالة</th><th>الصورة</th><th>الإجراءات</th></tr></thead><tbody>${checkTableRows()}</tbody></table></div></div>`;
   }
   window.refreshChecksPage=async function(){
     try{await loadFinance();setPage('الشيكات',checksPageHtml());renderCheckAlertBadge();}
@@ -452,6 +453,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
           <div><label>رقم الشيك</label><input id="checkNumber" placeholder="رقم الشيك"></div>
           <div><label>اسم البنك</label><input id="checkBank" placeholder="اسم البنك"></div>
           <div><label>اسم صاحب الشيك / الساحب</label><input id="checkDrawer" placeholder="اسم صاحب الشيك"></div>
+        <div><label>العميل صاحب الشيك</label><select id="checkCustomer"><option value="">اختر العميل</option>${financeCustomers.map(c=>`<option value="${safe(c.id)}">${safe(c.name)}</option>`).join('')}</select></div>
           <div><label>قيمة الشيك بالجنيه المصري</label><input id="checkAmount" type="number" min="0.01" step="0.01"></div>
           <div><label>تاريخ إصدار الشيك</label><input id="checkIssueDate" type="date" value="${today()}"></div>
           <div><label>موعد التحصيل</label><input id="checkCollectionDate" type="date"></div>
@@ -461,7 +463,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
         </div>
         <div class="finance-actions"><button type="button" onclick="saveCompanyCheck()">حفظ الشيك</button><button type="button" class="secondary" onclick="resetCheckForm()">إلغاء / تفريغ</button></div><p id="checkMsg" class="msg"></p>
         <div id="checkAlertsBox" class="finance-note hidden" role="status"></div>
-        <div class="finance-table"><table><thead><tr><th>رقم الشيك</th><th>البنك</th><th>الساحب</th><th>القيمة</th><th>تاريخ الإصدار</th><th>موعد التحصيل</th><th>الحالة</th><th>الصورة</th><th>الإجراءات</th></tr></thead><tbody id="checkRows">${checkTableRows()}</tbody></table></div>
+        <div class="finance-table"><table><thead><tr><th>رقم الشيك</th><th>البنك</th><th>الساحب</th><th>العميل صاحب الشيك</th><th>القيمة</th><th>تاريخ الإصدار</th><th>موعد التحصيل</th><th>الحالة</th><th>الصورة</th><th>الإجراءات</th></tr></thead><tbody id="checkRows">${checkTableRows()}</tbody></table></div>
       </div>`;
   }
 
@@ -573,7 +575,8 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
     let imageData=null;const file=el('checkImage').files?.[0];
     if(file){try{financeMsg('checkMsg','جارٍ تجهيز صورة الشيك...',true);imageData=await readCheckImage(file)}
       catch(e){financeMsg('checkMsg',e.message,false);return}}
-    const row={check_number:number,bank_name:bank,drawer_name:drawer||null,amount,issue_date:issue||null,collection_date:collection,notes:el('checkNotes').value.trim()||null,status:el('checkStatus').value};
+    const customerId=el('checkCustomer')?.value||null;
+    const row={check_number:number,bank_name:bank,drawer_name:drawer||null,customer_id:customerId,amount,issue_date:issue||null,collection_date:collection,notes:el('checkNotes').value.trim()||null,status:el('checkStatus').value};
     if(imageData)row.image_data=imageData;
     let result;
     if(editingCheckId!==null)result=await sb.from('company_checks').update(row).eq('id',editingCheckId);
@@ -582,13 +585,23 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
     financeMsg('checkMsg',editingCheckId!==null?'تم تحديث بيانات الشيك.':'تم حفظ الشيك بنجاح.',true);
     editingCheckId=null;await window.refreshChecksPage();
   };
-  window.resetCheckForm=function(){editingCheckId=null;['checkNumber','checkBank','checkDrawer','checkAmount','checkCollectionDate','checkNotes'].forEach(id=>{if(el(id))el(id).value=''});if(el('checkIssueDate'))el('checkIssueDate').value=today();if(el('checkStatus'))el('checkStatus').value='pending';if(el('checkImage'))el('checkImage').value='';if(el('checkMsg'))el('checkMsg').textContent=''};
+  window.resetCheckForm=function(){editingCheckId=null;['checkNumber','checkBank','checkDrawer','checkAmount','checkCollectionDate','checkNotes','checkCustomer'].forEach(id=>{if(el(id))el(id).value=''});if(el('checkIssueDate'))el('checkIssueDate').value=today();if(el('checkStatus'))el('checkStatus').value='pending';if(el('checkImage'))el('checkImage').value='';if(el('checkMsg'))el('checkMsg').textContent=''};
   window.editCompanyCheck=function(id){
     if(role!=='admin'){alert('تعديل الشيكات متاح للمدير فقط');return}
     const c=financeChecks.find(x=>String(x.id)===String(id));if(!c)return;editingCheckId=c.id;
-    el('checkNumber').value=c.check_number||'';el('checkBank').value=c.bank_name||'';el('checkDrawer').value=c.drawer_name||'';el('checkAmount').value=Number(c.amount||0);el('checkIssueDate').value=c.issue_date||'';el('checkCollectionDate').value=c.collection_date||'';el('checkNotes').value=c.notes||'';el('checkStatus').value=c.status||'pending';
+    el('checkNumber').value=c.check_number||'';el('checkBank').value=c.bank_name||'';el('checkDrawer').value=c.drawer_name||'';if(el('checkCustomer'))el('checkCustomer').value=c.customer_id||'';el('checkAmount').value=Number(c.amount||0);el('checkIssueDate').value=c.issue_date||'';el('checkCollectionDate').value=c.collection_date||'';el('checkNotes').value=c.notes||'';el('checkStatus').value=c.status||'pending';
     financeMsg('checkMsg','تعديل الشيك رقم '+c.check_number+'. اترك خانة الصورة فارغة للاحتفاظ بالصورة الحالية.',true);
     el('checkNumber').scrollIntoView({behavior:'smooth',block:'center'});
+  };
+  window.sendCheckReminderWhatsApp=function(id){
+    const c=financeChecks.find(x=>String(x.id)===String(id));
+    if(!c){alert('لم يتم العثور على بيانات الشيك. حدّث صفحة الشيكات وحاول مرة أخرى.');return}
+    const customer=financeCustomers.find(x=>String(x.id)===String(c.customer_id));
+    if(!customer){alert('اربط الشيك بعميل أولاً من خانة العميل صاحب الشيك ثم احفظه.');return}
+    const phone=normalizeWhatsAppPhone(customer.phone);
+    if(!phone){alert('لا يوجد رقم هاتف للعميل. أضف رقم واتساب في بيانات العميل أولاً.');return}
+    const message='تذكير بموعد استحقاق شيك\n\nالسيد/ '+(customer.name||'العميل')+'،\nتحية طيبة من شركة صن شاين للاستيراد والتصدير.\nنذكّركم ببيانات الشيك التالي:\nرقم الشيك: '+(c.check_number||'—')+'\nالبنك: '+(c.bank_name||'—')+'\nاسم الساحب: '+(c.drawer_name||'—')+'\nقيمة الشيك: '+money(c.amount)+' جنيه مصري\nتاريخ الإصدار: '+(c.issue_date||'—')+'\nتاريخ الاستحقاق/التحصيل: '+(c.collection_date||'—')+'\nالحالة: '+(c.status==='collected'?'تم التحصيل':'لم يتم التحصيل')+'\n\nبرجاء اتخاذ اللازم في موعد الاستحقاق.\nمع خالص التحية،\nصن شاين للاستيراد والتصدير';
+    window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(message),'_blank','noopener');
   };
   window.deleteCompanyCheck=async function(id){
     if(role!=='admin'){alert('حذف الشيكات متاح للمدير فقط');return}

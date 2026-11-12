@@ -10,7 +10,7 @@
 @media(max-width:800px){.layout{grid-template-columns:1fr}.side{position:static}.side nav{display:grid;grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){.invoice-fields{grid-template-columns:1fr}}
 @media print{@page{size:A4;margin:12mm}body *{visibility:hidden!important}#invoicePrint,#invoicePrint *{visibility:visible!important}#invoicePrint{display:block!important;position:absolute!important;left:0!important;top:0!important;width:100%!important;margin:0!important;padding:0!important;border:0!important;box-shadow:none!important;background:#fff!important;color:#000!important}#invoicePrint button,#invoicePrint .no-print{display:none!important}#invoicePrint input,#invoicePrint select,#invoicePrint textarea{border:0!important;padding:2px 0!important;color:#000!important;background:transparent!important;appearance:none!important;box-shadow:none!important}#invoicePrint .invoice-logo{width:138px!important;height:138px!important;max-width:138px!important}#invoicePrint .invoice-notes{border:1px solid #555!important;border-radius:0!important}#invoicePrint table{min-width:0!important;width:100%!important}#invoicePrint .scroll{overflow:visible!important}#invoicePrint th,#invoicePrint td{color:#000!important;border:1px solid #777!important}}
 </style></head><body>
-<header><div class="brand"><img src="sunshine-logo.png" alt="Sunshine"><div><b style="font-size:20px">نظام إدارة صن شاين</b><div class="muted" style="color:#fff">صن شاين للاستيراد والتصدير</div></div></div><div id="topuser" class="hidden"><span id="who"></span> <button id="shipmentBell" class="secondary" type="button" onclick="showShipmentArrivalAlerts()" title="تنبيهات وصول الشحنات" style="position:relative;font-size:20px;padding:7px 12px">🔔<span id="shipmentBellCount" style="display:none;position:absolute;top:-6px;left:-6px;background:#d41470;color:#fff;border-radius:50%;min-width:19px;height:19px;font-size:11px;line-height:19px;text-align:center">0</span></button> <button class="secondary" onclick="logout()">تسجيل الخروج</button></div></header>
+<header><div class="brand"><img src="sunshine-logo.png" alt="Sunshine"><div><b style="font-size:20px">نظام إدارة صن شاين</b><div class="muted" style="color:#fff">صن شاين للاستيراد والتصدير</div></div></div><div id="topuser" class="hidden"><span id="who"></span> <button id="shipmentBell" class="secondary" type="button" onclick="showShipmentArrivalAlerts()" title="تنبيهات وصول الشحنات" style="position:relative;font-size:20px;padding:7px 12px">🔔<span id="shipmentBellCount" style="display:none;position:absolute;top:-6px;left:-6px;background:#d41470;color:#fff;border-radius:50%;min-width:19px;height:19px;font-size:11px;line-height:19px;text-align:center">0</span></button> <button id="checksBell" class="secondary" type="button" onclick="showCheckAlerts()" title="تنبيهات تحصيل الشيكات" style="position:relative;font-size:20px;padding:7px 12px">🧾<span id="checksBellCount" style="display:none;position:absolute;top:-6px;left:-6px;background:#d41470;color:#fff;border-radius:50%;min-width:19px;height:19px;font-size:11px;line-height:19px;text-align:center">0</span></button> <button class="secondary" onclick="logout()">تسجيل الخروج</button></div></header>
 <div class="wrap">
 <section id="setup" class="card"><h2>إعداد الاتصال بقاعدة البيانات</h2><p class="muted">أدخل رابط مشروع قاعدة البيانات ومفتاح النشر العام فقط. لا تضع المفتاح السري هنا.</p><div class="grid"><div><label>رابط مشروع قاعدة البيانات</label><input id="url" placeholder="رابط المشروع"></div><div><label>مفتاح النشر العام</label><input id="key" placeholder="مفتاح النشر العام"></div></div><button onclick="saveConfig()">حفظ الاتصال</button><p id="setupmsg" class="msg"></p></section>
 <section id="login" class="card login hidden"><h2 id="loginTitle">تسجيل دخول المدير</h2><label>نوع الحساب</label><select id="loginType" onchange="switchLogin()"><option value="admin">المدير - البريد الإلكتروني</option><option value="employee">الموظف - اسم المستخدم</option></select><div id="emailBox"><label>البريد الإلكتروني</label><input id="email" type="email" autocomplete="username"></div><div id="usernameBox" class="hidden"><label>اسم المستخدم</label><input id="username" autocomplete="username"></div><label>كلمة المرور</label><input id="password" type="password" autocomplete="current-password"><button onclick="login()">دخول</button><p id="loginmsg" class="msg"></p></section>
@@ -41,7 +41,7 @@ function saveConfig(){const u=$('url').value.trim(),k=$('key').value.trim();if(!
 function connect(){const u=localStorage.getItem('sun_url'),k=localStorage.getItem('sun_key');if(!u||!k)return;$('url').value=u;$('key').value=k;sb=window.supabase.createClient(u,k);window.sb=sb;$('setup').classList.add('hidden');$('login').classList.remove('hidden');sb.auth.getSession().then(async({data})=>{if(data.session)await enterApp()})}
 function switchLogin(){const emp=$('loginType').value==='employee';$('emailBox').classList.toggle('hidden',emp);$('usernameBox').classList.toggle('hidden',!emp);$('loginTitle').textContent=emp?'تسجيل دخول الموظف':'تسجيل دخول المدير'}
 async function login(){const emp=$('loginType').value==='employee';const email=emp?$('username').value.trim().toLowerCase()+'@employees.sunshine-erp.invalid':$('email').value.trim();$('loginmsg').textContent='جارٍ التحقق...';const {error}=await sb.auth.signInWithPassword({email,password:$('password').value});if(error){$('loginmsg').textContent='بيانات الدخول غير صحيحة: '+error.message;$('loginmsg').className='msg error';return}await enterApp()}
-async function enterApp(){const {data:{user}}=await sb.auth.getUser();const {data,error}=await sb.rpc('current_user_role');if(error||!data){await sb.auth.signOut();$('loginmsg').textContent='لم يتم العثور على صلاحية لهذا الحساب. راجع user_roles.';return}role=data;$('who').textContent=user.email+' ('+(role==='admin'?'مدير':'موظف')+')';$('topuser').classList.remove('hidden');$('login').classList.add('hidden');$('application').classList.remove('hidden');document.querySelectorAll('[data-admin="1"]').forEach(b=>b.classList.toggle('hidden',role!=='admin'));document.querySelectorAll('[data-cost-only]').forEach(n=>n.classList.toggle('hidden',role!=='admin'));await loadItems();await loadCustomers();await loadInvoiceCompanyContact();await loadNextInvoiceNumber();if(role==='admin'){await loadShipments();loadUsdEgpRate();if(window.loadAdminProfitDashboard)await window.loadAdminProfitDashboard()}else{$('adminProfitDashboard')?.classList.add('hidden')}}
+async function enterApp(){const {data:{user}}=await sb.auth.getUser();const {data,error}=await sb.rpc('current_user_role');if(error||!data){await sb.auth.signOut();$('loginmsg').textContent='لم يتم العثور على صلاحية لهذا الحساب. راجع user_roles.';return}role=data;$('who').textContent=user.email+' ('+(role==='admin'?'مدير':'موظف')+')';$('topuser').classList.remove('hidden');$('login').classList.add('hidden');$('application').classList.remove('hidden');document.querySelectorAll('[data-admin="1"]').forEach(b=>b.classList.toggle('hidden',role!=='admin'));document.querySelectorAll('[data-cost-only]').forEach(n=>n.classList.toggle('hidden',role!=='admin'));await loadItems();await loadCustomers();await loadInvoiceCompanyContact();if(window.loadCheckAlertBadge)window.loadCheckAlertBadge();await loadNextInvoiceNumber();if(role==='admin'){await loadShipments();loadUsdEgpRate();if(window.loadAdminProfitDashboard)await window.loadAdminProfitDashboard()}else{$('adminProfitDashboard')?.classList.add('hidden')}}
 async function loadInvoiceCompanyContact(){
  const host=$('invoiceCompanyContact');if(!host||!sb)return;
  const {data,error}=await sb.from('company_settings').select('company_name,phone,address').eq('id',1).maybeSingle();
@@ -348,7 +348,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
 /* وحدة الحسابات والخزينة — متوافقة مع schema SQL Sunshine */
 (function(){
   const originalOpenPage=window.openPage;
-  let financeBanks=[], financeTx=[], financeCustomers=[], financeSettings=null;
+  let financeBanks=[], financeTx=[], financeCustomers=[], financeSettings=null, financeChecks=[], editingCheckId=null;
   const money=n=>Number(n||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2})+' جنيه';
   const today=()=>new Date().toISOString().slice(0,10);
   const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -383,6 +383,21 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
     ]);
     if(b.error)throw b.error;if(t.error)throw t.error;
     financeBanks=b.data||[];financeTx=t.data||[];financeCustomers=c.error?[]:(c.data||[]);
+    const checks=await sb.from('company_checks').select('id,check_number,bank_name,drawer_name,amount,issue_date,collection_date,notes,image_data,status,created_at').order('collection_date',{ascending:true});
+    if(checks.error){financeChecks=[];console.warn('تعذر تحميل الشيكات:',checks.error.message)}
+    else financeChecks=checks.data||[];
+    renderCheckAlertBadge();
+  }
+  function checkTableRows(){
+    return financeChecks.map(c=>`<tr><td>${safe(c.check_number)}</td><td>${safe(c.bank_name||'')}</td><td>${safe(c.drawer_name||'')}</td><td>${money(c.amount)}</td><td>${safe(c.issue_date||'')}</td><td>${safe(c.collection_date||'')}</td><td>${c.status==='collected'?'محصّل':'لم يتم التحصيل'}</td><td>${c.image_data?`<a href="${safe(c.image_data)}" target="_blank" rel="noopener">عرض الصورة</a>`:'لا توجد'}</td><td>${role==='admin'?`<button type="button" class="secondary" onclick="editCompanyCheck('${String(c.id)}')">تعديل</button> <button type="button" style="background:#a11" onclick="deleteCompanyCheck('${String(c.id)}')">حذف</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="9">لا توجد شيكات مسجلة.</td></tr>';
+  }
+  function renderCheckAlertBadge(){
+    const todayDate=new Date();todayDate.setHours(0,0,0,0);
+    const due=financeChecks.filter(c=>c.status!=='collected'&&c.collection_date).filter(c=>{
+      const d=new Date(c.collection_date+'T00:00:00');const days=Math.ceil((d-todayDate)/86400000);return days<=2;
+    });
+    const badge=el('checksBellCount');if(badge){badge.textContent=String(due.length);badge.style.display=due.length?'inline-block':'none'}
+    const box=el('checkAlertsBox');if(box){box.classList.toggle('hidden',!due.length);box.innerHTML=due.map(c=>`• الشيك رقم ${safe(c.check_number)} — ${safe(c.bank_name||'')} — موعد التحصيل ${safe(c.collection_date)} — ${money(c.amount)}`).join('<br>')}
   }
   function financePageHtml(){
     const bal=calcBalances();
@@ -410,6 +425,22 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
         <div><label>من تاريخ</label><input id="statementFrom" type="date"></div><div><label>إلى تاريخ</label><input id="statementTo" type="date"></div></div>
         <div class="finance-actions"><button type="button" onclick="loadCustomerStatement()">عرض كشف الحساب</button><button type="button" class="secondary" onclick="printCustomerStatement()">طباعة / حفظ PDF</button><button type="button" style="background:#168b55" onclick="sendCustomerStatementWhatsApp()">إرسال ملخص عبر واتساب</button></div>
         <p id="statementMsg" class="msg"></p><div id="customerStatementPrint" class="hidden"><div class="invoice-head"><div><h2>صن شاين للاستيراد والتصدير</h2><b>كشف حساب عميل</b></div><div id="statementPrintMeta"></div></div><div id="statementSummary" class="finance-stats"></div><div class="finance-table"><table><thead><tr><th>التاريخ</th><th>البيان</th><th>رقم الفاتورة</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead><tbody id="statementRows"></tbody></table></div><p id="statementPrintFooter" class="muted"></p></div>
+      </div>
+      <div class="finance-section"><h3>إدارة الشيكات</h3><p class="muted">سجّل بيانات الشيك وارفق صورته وحدد موعد التحصيل. يظهر تنبيه للمدير والموظف قبل موعد التحصيل بيومين ويستمر في يوم الاستحقاق وبعده حتى تحديث الحالة إلى محصّل.</p>
+        <div class="finance-form">
+          <div><label>رقم الشيك</label><input id="checkNumber" placeholder="رقم الشيك"></div>
+          <div><label>اسم البنك</label><input id="checkBank" placeholder="اسم البنك"></div>
+          <div><label>اسم صاحب الشيك / الساحب</label><input id="checkDrawer" placeholder="اسم صاحب الشيك"></div>
+          <div><label>قيمة الشيك بالجنيه المصري</label><input id="checkAmount" type="number" min="0.01" step="0.01"></div>
+          <div><label>تاريخ إصدار الشيك</label><input id="checkIssueDate" type="date" value="${today()}"></div>
+          <div><label>موعد التحصيل</label><input id="checkCollectionDate" type="date"></div>
+          <div><label>حالة الشيك</label><select id="checkStatus"><option value="pending">لم يتم التحصيل</option><option value="collected">تم التحصيل</option></select></div>
+          <div><label>صورة الشيك</label><input id="checkImage" type="file" accept="image/*"><small class="muted">صورة واضحة، بحد أقصى 2 ميجابايت.</small></div>
+          <div style="grid-column:1/-1"><label>بيانات / ملاحظات الشيك</label><textarea id="checkNotes" rows="2" style="width:100%;padding:10px;border:1px solid #d9d5df;border-radius:8px"></textarea></div>
+        </div>
+        <div class="finance-actions"><button type="button" onclick="saveCompanyCheck()">حفظ الشيك</button><button type="button" class="secondary" onclick="resetCheckForm()">إلغاء / تفريغ</button></div><p id="checkMsg" class="msg"></p>
+        <div id="checkAlertsBox" class="finance-note hidden" role="status"></div>
+        <div class="finance-table"><table><thead><tr><th>رقم الشيك</th><th>البنك</th><th>الساحب</th><th>القيمة</th><th>تاريخ الإصدار</th><th>موعد التحصيل</th><th>الحالة</th><th>الصورة</th><th>الإجراءات</th></tr></thead><tbody id="checkRows">${checkTableRows()}</tbody></table></div>
       </div>`;
   }
 
@@ -467,8 +498,50 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
     window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(message),'_blank','noopener');
   };
 
+  window.loadCheckAlertBadge=async function(){
+    if(!sb)return;
+    const {data,error}=await sb.from('company_checks').select('id,check_number,bank_name,amount,collection_date,status');
+    if(error){const badge=el('checksBellCount');if(badge)badge.style.display='none';return}
+    financeChecks=data||[];renderCheckAlertBadge();
+  };
+  window.showCheckAlerts=async function(){
+    const {data,error}=await sb.from('company_checks').select('id,check_number,bank_name,amount,collection_date,status').order('collection_date',{ascending:true});
+    if(error){alert('تعذر تحميل تنبيهات الشيكات. تأكد من تشغيل ملف SQL المرفق. '+error.message);return}
+    const now=new Date();now.setHours(0,0,0,0);
+    const due=(data||[]).filter(c=>c.status!=='collected'&&c.collection_date).map(c=>({...c,days:Math.ceil((new Date(c.collection_date+'T00:00:00')-now)/86400000)})).filter(c=>c.days<=2);
+    alert(due.length?'تنبيهات تحصيل الشيكات:\\n'+due.map(c=>'رقم '+c.check_number+' — '+(c.bank_name||'')+' — '+c.amount+' جنيه — '+c.collection_date+(c.days===0?' (اليوم)':c.days>0?` (متبقي ${c.days} يوم)`:' (متأخر)')).join('\\n'):'لا توجد شيكات تستحق التحصيل خلال اليومين القادمين.');
+  };
+  window.saveCompanyCheck=async function(){
+    const number=el('checkNumber').value.trim(),bank=el('checkBank').value.trim(),drawer=el('checkDrawer').value.trim(),amount=Number(el('checkAmount').value),issue=el('checkIssueDate').value,collection=el('checkCollectionDate').value;
+    if(!number||!bank||!Number.isFinite(amount)||amount<=0||!collection){financeMsg('checkMsg','أدخل رقم الشيك والبنك والقيمة وموعد التحصيل بشكل صحيح.',false);return}
+    let imageData=null;const file=el('checkImage').files?.[0];
+    if(file){if(!file.type.startsWith('image/')){financeMsg('checkMsg','الملف المرفق يجب أن يكون صورة.',false);return}if(file.size>2*1024*1024){financeMsg('checkMsg','حجم صورة الشيك أكبر من 2 ميجابايت. اختر صورة أصغر.',false);return}
+      imageData=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error('تعذرت قراءة الصورة'));reader.readAsDataURL(file)});}
+    const row={check_number:number,bank_name:bank,drawer_name:drawer||null,amount,issue_date:issue||null,collection_date:collection,notes:el('checkNotes').value.trim()||null,status:el('checkStatus').value};
+    if(imageData)row.image_data=imageData;
+    let result;
+    if(editingCheckId!==null)result=await sb.from('company_checks').update(row).eq('id',editingCheckId);
+    else {row.created_by=(await sb.auth.getUser()).data?.user?.id||null;result=await sb.from('company_checks').insert(row)}
+    if(result.error){financeMsg('checkMsg','تعذر حفظ الشيك: '+result.error.message+' — تأكد من تشغيل ملف SQL المرفق.',false);return}
+    financeMsg('checkMsg',editingCheckId!==null?'تم تحديث بيانات الشيك.':'تم حفظ الشيك بنجاح.',true);
+    editingCheckId=null;await window.refreshFinancePage();
+  };
+  window.resetCheckForm=function(){editingCheckId=null;['checkNumber','checkBank','checkDrawer','checkAmount','checkCollectionDate','checkNotes'].forEach(id=>{if(el(id))el(id).value=''});if(el('checkIssueDate'))el('checkIssueDate').value=today();if(el('checkStatus'))el('checkStatus').value='pending';if(el('checkImage'))el('checkImage').value='';if(el('checkMsg'))el('checkMsg').textContent=''};
+  window.editCompanyCheck=function(id){
+    if(role!=='admin'){alert('تعديل الشيكات متاح للمدير فقط');return}
+    const c=financeChecks.find(x=>String(x.id)===String(id));if(!c)return;editingCheckId=c.id;
+    el('checkNumber').value=c.check_number||'';el('checkBank').value=c.bank_name||'';el('checkDrawer').value=c.drawer_name||'';el('checkAmount').value=Number(c.amount||0);el('checkIssueDate').value=c.issue_date||'';el('checkCollectionDate').value=c.collection_date||'';el('checkNotes').value=c.notes||'';el('checkStatus').value=c.status||'pending';
+    financeMsg('checkMsg','تعديل الشيك رقم '+c.check_number+'. اترك خانة الصورة فارغة للاحتفاظ بالصورة الحالية.',true);
+    el('checkNumber').scrollIntoView({behavior:'smooth',block:'center'});
+  };
+  window.deleteCompanyCheck=async function(id){
+    if(role!=='admin'){alert('حذف الشيكات متاح للمدير فقط');return}
+    if(!confirm('هل تريد حذف سجل هذا الشيك؟'))return;
+    const {error}=await sb.from('company_checks').delete().eq('id',id);
+    if(error){alert('تعذر حذف الشيك: '+error.message);return}await window.refreshFinancePage();
+  };
   window.financeToggleFields=function(){const kind=el('finKind')?.value,src=el('finSourceType')?.value,target=el('finTargetType')?.value;if(!kind)return;el('finSourceBankBox').classList.toggle('hidden',src!=='bank');el('finTargetTypeBox').classList.toggle('hidden',kind!=='transfer');el('finTargetBankBox').classList.toggle('hidden',kind!=='transfer'||target!=='bank');el('finCustomerBox').classList.toggle('hidden',kind==='transfer')};
-  window.refreshFinancePage=async function(){try{await loadFinance();setPage('الحسابات والخزينة',financePageHtml());financeToggleFields()}catch(e){alert('تعذر تحديث الحسابات والخزينة: '+e.message)}};
+  window.refreshFinancePage=async function(){try{await loadFinance();setPage('الحسابات والخزينة',financePageHtml());financeToggleFields();renderCheckAlertBadge()}catch(e){alert('تعذر تحديث الحسابات والخزينة: '+e.message)}};
   window.addFinanceBank=async function(){if(role!=='admin'){alert('إضافة البنوك متاحة للمدير فقط');return}const bank_name=el('newBankName').value.trim(),account_name=el('newBankOwner').value.trim()||null,account_number=el('newBankNumber').value.trim()||null,opening_balance=Number(el('newBankOpening').value||0);if(!bank_name||!Number.isFinite(opening_balance)||opening_balance<0){financeMsg('bankMsg','اكتب اسم البنك وتأكد من صحة الرصيد.',false);return}const {error}=await sb.from('bank_accounts').insert({bank_name,account_name,account_number,opening_balance,is_active:true});if(error){financeMsg('bankMsg','تعذر إضافة البنك: '+error.message,false);return}await refreshFinancePage();};
   window.saveFinanceTransaction=async function(){
     const kind=el('finKind').value,account_type=el('finSourceType').value,amount=Number(el('finAmount').value),transaction_date=el('finDate').value||today(),description=el('finDescription').value.trim()||null;

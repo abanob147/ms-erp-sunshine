@@ -389,7 +389,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
     renderCheckAlertBadge();
   }
   function checkTableRows(){
-    return financeChecks.map(c=>`<tr><td>${safe(c.check_number)}</td><td>${safe(c.bank_name||'')}</td><td>${safe(c.drawer_name||'')}</td><td>${money(c.amount)}</td><td>${safe(c.issue_date||'')}</td><td>${safe(c.collection_date||'')}</td><td>${c.status==='collected'?'محصّل':'لم يتم التحصيل'}</td><td>${c.image_data?`<a href="${safe(c.image_data)}" target="_blank" rel="noopener">عرض الصورة</a>`:'لا توجد'}</td><td>${role==='admin'?`<button type="button" class="secondary" onclick="editCompanyCheck('${String(c.id)}')">تعديل</button> <button type="button" style="background:#a11" onclick="deleteCompanyCheck('${String(c.id)}')">حذف</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="9">لا توجد شيكات مسجلة.</td></tr>';
+    return financeChecks.map(c=>`<tr><td>${safe(c.check_number)}</td><td>${safe(c.bank_name||'')}</td><td>${safe(c.drawer_name||'')}</td><td>${money(c.amount)}</td><td>${safe(c.issue_date||'')}</td><td>${safe(c.collection_date||'')}</td><td>${c.status==='collected'?'محصّل':'لم يتم التحصيل'}</td><td>${c.image_data?`<button type="button" class="secondary" onclick="showCheckImage('${String(c.id)}')">عرض الصورة</button>`:'لا توجد'}</td><td>${role==='admin'?`<button type="button" class="secondary" onclick="editCompanyCheck('${String(c.id)}')">تعديل</button> <button type="button" style="background:#a11" onclick="deleteCompanyCheck('${String(c.id)}')">حذف</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="9">لا توجد شيكات مسجلة.</td></tr>';
   }
   function renderCheckAlertBadge(){
     const todayDate=new Date();todayDate.setHours(0,0,0,0);
@@ -410,7 +410,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
         <div><label>تاريخ إصدار الشيك</label><input id="checkIssueDate" type="date" value="${today()}"></div>
         <div><label>موعد التحصيل</label><input id="checkCollectionDate" type="date"></div>
         <div><label>حالة الشيك</label><select id="checkStatus"><option value="pending">لم يتم التحصيل</option><option value="collected">تم التحصيل</option></select></div>
-        <div><label>صورة الشيك</label><input id="checkImage" type="file" accept="image/*"><small class="muted">صورة بحد أقصى 2 ميجابايت.</small></div>
+        <div><label>صورة الشيك</label><input id="checkImage" type="file" accept="image/*,.jfif,.jpg,.jpeg,.png,.webp"><small class="muted">صورة بحد أقصى 2 ميجابايت.</small></div>
         <div style="grid-column:1/-1"><label>بيانات / ملاحظات الشيك</label><textarea id="checkNotes" rows="2" style="width:100%;padding:10px;border:1px solid #d9d5df;border-radius:8px"></textarea></div>
       </div><div class="finance-actions"><button type="button" onclick="saveCompanyCheck()">حفظ الشيك</button><button type="button" class="secondary" onclick="resetCheckForm()">تفريغ الحقول</button></div><p id="checkMsg" class="msg"></p></div>
       <div class="finance-section"><h4>قائمة الشيكات المسجلة</h4><div id="checkAlertsBox" class="finance-note hidden" role="status"></div>
@@ -532,12 +532,47 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
     const due=(data||[]).filter(c=>c.status!=='collected'&&c.collection_date).map(c=>({...c,days:Math.ceil((new Date(c.collection_date+'T00:00:00')-now)/86400000)})).filter(c=>c.days<=2);
     alert(due.length?'تنبيهات تحصيل الشيكات:\\n'+due.map(c=>'رقم '+c.check_number+' — '+(c.bank_name||'')+' — '+c.amount+' جنيه — '+c.collection_date+(c.days===0?' (اليوم)':c.days>0?` (متبقي ${c.days} يوم)`:' (متأخر)')).join('\\n'):'لا توجد شيكات تستحق التحصيل خلال اليومين القادمين.');
   };
+  async function readCheckImage(file){
+    const ext=(file.name.split('.').pop()||'').toLowerCase();
+    const allowed=['jpg','jpeg','jfif','png','webp','gif','bmp'];
+    if(!(file.type&&file.type.startsWith('image/'))&&!allowed.includes(ext))
+      throw new Error('الملف غير معروف كصورة. اختر JPG أو JPEG أو PNG أو JFIF أو WEBP.');
+    if(file.size>10*1024*1024)throw new Error('حجم الصورة أكبر من 10 ميجابايت.');
+    const raw=await new Promise((resolve,reject)=>{
+      const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));
+      reader.onerror=()=>reject(new Error('تعذرت قراءة ملف الصورة.'));reader.readAsDataURL(file);
+    });
+    try{
+      const img=await new Promise((resolve,reject)=>{
+        const node=new Image();node.onload=()=>resolve(node);node.onerror=()=>reject(new Error('تعذر فتح الصورة. جرّب حفظها بصيغة JPG ثم أعد رفعها.'));
+        node.src=raw;
+      });
+      const scale=Math.min(1,1600/Math.max(img.naturalWidth,img.naturalHeight));
+      const canvas=document.createElement('canvas');
+      canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));
+      canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+      const ctx=canvas.getContext('2d');ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      return canvas.toDataURL('image/jpeg',0.78);
+    }catch(e){if(ext==='jfif'||ext==='jpg'||ext==='jpeg')return raw;throw e}
+  }
+  window.showCheckImage=function(id){
+    const c=financeChecks.find(x=>String(x.id)===String(id));if(!c?.image_data)return;
+    let modal=document.getElementById('checkImageModal');
+    if(!modal){
+      modal=document.createElement('div');modal.id='checkImageModal';
+      modal.style.cssText='position:fixed;inset:0;background:#000b;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+      modal.innerHTML='<div style="background:#fff;border-radius:12px;padding:14px;max-width:95vw;max-height:95vh;overflow:auto;text-align:center"><button type="button" onclick="document.getElementById(\'checkImageModal\').remove()">إغلاق</button><div id="checkImageModalTitle" style="font-weight:bold;margin:10px"></div><img id="checkImageModalPhoto" style="display:block;max-width:88vw;max-height:78vh;object-fit:contain"></div>';
+      modal.addEventListener('click',e=>{if(e.target===modal)modal.remove()});document.body.appendChild(modal);
+    }
+    document.getElementById('checkImageModalTitle').textContent='صورة الشيك رقم '+c.check_number;
+    document.getElementById('checkImageModalPhoto').src=c.image_data;
+  };
   window.saveCompanyCheck=async function(){
     const number=el('checkNumber').value.trim(),bank=el('checkBank').value.trim(),drawer=el('checkDrawer').value.trim(),amount=Number(el('checkAmount').value),issue=el('checkIssueDate').value,collection=el('checkCollectionDate').value;
     if(!number||!bank||!Number.isFinite(amount)||amount<=0||!collection){financeMsg('checkMsg','أدخل رقم الشيك والبنك والقيمة وموعد التحصيل بشكل صحيح.',false);return}
     let imageData=null;const file=el('checkImage').files?.[0];
-    if(file){if(!file.type.startsWith('image/')){financeMsg('checkMsg','الملف المرفق يجب أن يكون صورة.',false);return}if(file.size>2*1024*1024){financeMsg('checkMsg','حجم صورة الشيك أكبر من 2 ميجابايت. اختر صورة أصغر.',false);return}
-      imageData=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error('تعذرت قراءة الصورة'));reader.readAsDataURL(file)});}
+    if(file){try{financeMsg('checkMsg','جارٍ تجهيز صورة الشيك...',true);imageData=await readCheckImage(file)}
+      catch(e){financeMsg('checkMsg',e.message,false);return}}
     const row={check_number:number,bank_name:bank,drawer_name:drawer||null,amount,issue_date:issue||null,collection_date:collection,notes:el('checkNotes').value.trim()||null,status:el('checkStatus').value};
     if(imageData)row.image_data=imageData;
     let result;

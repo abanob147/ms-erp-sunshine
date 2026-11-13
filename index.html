@@ -880,38 +880,56 @@ window.purchaseLoadLedger=async function(){const id=Number($p('pLedgerSupplier')
     <p id="sunshineResetMsg" class="msg" role="status"></p>
    </section>`);
  };
- const backupTables=['customers','suppliers','items','import_shipments','sales','sale_items','purchases','purchase_items','customer_transactions','supplier_ledger','account_transactions','bank_accounts','operating_expenses','company_checks','company_settings','user_roles'];
+
+ let sunshineResetTicket=null;
  window.sunshineDownloadPreResetBackup=async function(){
-   if(role!=='admin'){alert('هذه العملية متاحة للمدير فقط');return}
-   const msg=$('sunshineResetMsg'),btn=$('sunshineBackupBtn'); if(btn){btn.disabled=true;btn.textContent='جارٍ تجهيز النسخة...'}
+   if(role!=='admin'){alert('هذه العملية متاحة للمدير فقط');return false}
+   const msg=$('sunshineResetMsg'),btn=$('sunshineBackupBtn');
+   if(btn){btn.disabled=true;btn.textContent='جارٍ تجهيز النسخة الآمنة...'}
    try{
-     const backup={system:'Sunshine ERP',created_at:new Date().toISOString(),note:'نسخة احتياطية قبل التصفير',tables:{}};
-     for(const table of backupTables){const {data,error}=await sb.from(table).select('*');if(error){if(['company_checks','operating_expenses','user_roles'].includes(table)&&/does not exist|relation .* not found/i.test(error.message)){backup.tables[table]=[];continue}throw new Error('تعذر نسخ جدول '+table+': '+error.message)}backup.tables[table]=data||[];}
-     const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Sunshine_ERP_Backup_'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
-     if(msg){msg.textContent='تم تجهيز النسخة الاحتياطية وبدء تنزيلها. تأكد من وجود الملف على الكمبيوتر قبل التصفير.';msg.className='msg ok'}
-   }catch(e){if(msg){msg.textContent=e.message||String(e);msg.className='msg error'}}
-   finally{if(btn){btn.disabled=false;btn.textContent='تنزيل نسخة احتياطية قبل التصفير'}}
+     const {data,error}=await sb.rpc('admin_prepare_reset');
+     if(error)throw error;
+     if(!data?.token||!data?.digest||!data?.backup_text)throw new Error('لم تُرجع قاعدة البيانات بيانات النسخة الاحتياطية كاملة.');
+     const parsed=JSON.parse(data.backup_text);
+     if(!parsed?.tables||typeof parsed.tables!=='object')throw new Error('محتوى النسخة الاحتياطية غير مكتمل.');
+     const blob=new Blob([data.backup_text],{type:'application/json;charset=utf-8'});
+     const url=URL.createObjectURL(blob),a=document.createElement('a');
+     a.href=url;a.download='Sunshine_ERP_Backup_'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';
+     document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);
+     sunshineResetTicket={token:data.token,digest:data.digest};
+     if(msg){msg.textContent='تم تجهيز النسخة الاحتياطية وبدأ تنزيلها. احفظ الملف على الكمبيوتر، ثم اضغط زر التصفير عند التأكد من وجوده.';msg.className='msg ok'}
+     return true;
+   }catch(e){
+     sunshineResetTicket=null;
+     if(msg){msg.textContent='تعذر إنشاء النسخة الاحتياطية: '+(e.message||String(e));msg.className='msg error'}
+     return false;
+   }finally{if(btn){btn.disabled=false;btn.textContent='تنزيل نسخة احتياطية قبل التصفير'}}
  };
  window.sunshineRunSafeReset=async function(){
    if(role!=='admin'){alert('التصفير متاح للمدير فقط');return}
-   const password=$('sunshineResetPassword')?.value||'';if(!password){$('sunshineResetMsg').textContent='أدخل كلمة مرور المدير أولاً.';return}
-   if(!confirm('تحذير نهائي: سيتم حذف فواتير البيع وتفاصيلها وكشف حساب العملاء والمصروفات التشغيلية فقط. ستبقى جميع الشيكات وفواتير المشتريات وتفاصيلها وكشوف الموردين والحسابات البنكية وحركاتها، وكذلك بيانات العملاء والموردين والأصناف وكميات المخزون وأسعار البيع والشراء والشحنات وحسابات الدخول وإعدادات الشركة. هل تريد المتابعة؟'))return;
-   const btn=$('sunshineResetBtn'),msg=$('sunshineResetMsg');btn.disabled=true;btn.textContent='جارٍ إنشاء النسخة الاحتياطية...';
+   const password=$('sunshineResetPassword')?.value||'',msg=$('sunshineResetMsg');
+   if(!password){msg.textContent='أدخل كلمة مرور المدير أولاً.';msg.className='msg error';return}
+   if(!sunshineResetTicket){
+     msg.textContent='نزّل النسخة الاحتياطية أولاً وتأكد من حفظها على الكمبيوتر.';msg.className='msg error';return;
+   }
+   if(!confirm('تأكيد نهائي: سيتم حذف فواتير البيع وتفاصيلها وكشف حساب العملاء والمصروفات التشغيلية فقط. لن تُحذف الشيكات أو المشتريات أو الموردون أو الحسابات البنكية أو العملاء أو الأصناف أو كميات المخزون أو الشحنات أو المستخدمون أو إعدادات الشركة. هل حفظت النسخة الاحتياطية وتريد المتابعة؟'))return;
+   const btn=$('sunshineResetBtn');btn.disabled=true;btn.textContent='جارٍ التحقق والتصفير...';
    try{
-     // Always download a fresh backup immediately before the reset RPC.
-     await sunshineDownloadPreResetBackup();
-     if(msg.textContent.startsWith('تعذر')||msg.className.includes('error'))throw new Error(msg.textContent);
-     const {data:{user},error:userError}=await sb.auth.getUser();if(userError||!user?.email)throw new Error('تعذر التحقق من حساب المدير.');
-     const {error:authError}=await sb.auth.signInWithPassword({email:user.email,password});if(authError)throw new Error('كلمة مرور المدير غير صحيحة.');
-     msg.textContent='جارٍ تصفير بيانات التشغيل...';msg.className='msg';
-     const {data,error}=await sb.rpc('admin_reset_business_data');if(error)throw error;
+     const {data:{user},error:userError}=await sb.auth.getUser();
+     if(userError||!user?.email)throw new Error('تعذر التحقق من حساب المدير.');
+     const {error:authError}=await sb.auth.signInWithPassword({email:user.email,password});
+     if(authError)throw new Error('كلمة مرور المدير غير صحيحة.');
+     const {data,error}=await sb.rpc('admin_reset_business_data',{p_token:sunshineResetTicket.token,p_backup_digest:sunshineResetTicket.digest});
+     if(error)throw error;
      if(!data?.success)throw new Error('لم تؤكد قاعدة البيانات نجاح التصفير.');
-     $('sunshineResetPassword').value='';msg.textContent='تم تصفير بيانات التشغيل بنجاح. احتفظ بملف النسخة الاحتياطية الذي تم تنزيله.';msg.className='msg ok';
+     sunshineResetTicket=null;$('sunshineResetPassword').value='';
+     msg.textContent='تم تصفير بيانات التشغيل بنجاح. احتفظ بملف النسخة الاحتياطية.';msg.className='msg ok';
      await loadItems();await loadCustomers();await loadNextInvoiceNumber();
      if(window.loadAdminProfitDashboard)await window.loadAdminProfitDashboard();
    }catch(e){msg.textContent='لم يتم إكمال التصفير: '+(e.message||String(e));msg.className='msg error'}
    finally{btn.disabled=false;btn.textContent='نسخة احتياطية ثم تصفير البرنامج'}
  };
+
 })();
 </script>
 </body></html>

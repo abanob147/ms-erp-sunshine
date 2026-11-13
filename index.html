@@ -697,8 +697,8 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
  window.purchaseAddLine=function(){const host=$p('pLines');if(!host)return;const n=host.children.length;const div=document.createElement('div');div.className='grid';div.style.marginBottom='8px';div.innerHTML=`<div><label>الصنف</label><select class="pItem"><option value="">اختر الصنف</option>${pItems.map(x=>`<option value="${x.id}">${safeP(x.name)}</option>`).join('')}</select></div><div><label>الكمية</label><input class="pQty" type="number" min="0.001" step="0.001" value="1"></div><div><label>سعر الوحدة (جنيه)</label><input class="pPrice" type="number" min="0" step="0.01" value="0"></div><div><label>الإجمالي</label><input class="pLineTotal" readonly value="0.00"></div><div style="align-self:end"><button type="button" class="secondary" onclick="this.closest('.grid').remove();purchaseCalc()">حذف السطر</button></div>`;host.appendChild(div);div.querySelectorAll('input,select').forEach(x=>x.addEventListener('input',purchaseCalc));};
  window.purchaseCalc=function(){let total=0;document.querySelectorAll('#pLines .grid').forEach(r=>{const q=Number(r.querySelector('.pQty').value||0),p=Number(r.querySelector('.pPrice').value||0),t=q*p;r.querySelector('.pLineTotal').value=t.toFixed(2);total+=t});if($p('pTotal'))$p('pTotal').textContent=total.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' جنيه';};
  function pMsg(s,ok){if($p('pMsg')){$p('pMsg').textContent=s;$p('pMsg').className='msg '+(ok?'ok':'error')}}
- window.purchaseSave=async function(){if(role!=='admin'){pMsg('فواتير المشتريات متاحة للمدير فقط',false);return}if(!window.sb){pMsg('اتصال قاعدة البيانات غير متاح',false);return}const items=[...document.querySelectorAll('#pLines .grid')].map(r=>({item_id:Number(r.querySelector('.pItem').value),quantity:Number(r.querySelector('.pQty').value),unit_price:Number(r.querySelector('.pPrice').value)}));if(!items.length||items.some(x=>!x.item_id||x.quantity<=0||x.unit_price<0)){pMsg('اختر صنفًا وأدخل كمية وسعرًا صحيحين لكل سطر',false);return}const payload={invoice_number:$p('pInvoiceNo').value.trim(),purchase_date:$p('pDate').value,supplier_id:$p('pSupplier').value,shipment_id:$p('pShipment').value||null,paid_amount:Number($p('pPaid').value||0),notes:$p('pNotes').value,items};if(!payload.invoice_number||!payload.supplier_id){pMsg('رقم الفاتورة واختيار المورد مطلوبان',false);return}const {error}=await sb.rpc('admin_save_purchase_invoice',{p_invoice:payload});if(error){pMsg('تعذر الحفظ: '+error.message,false);return}pMsg('تم حفظ الفاتورة وترحيل كمياتها للمخزون وتحديث كشف المورد مرة واحدة.',true);$p('pInvoiceNo').value='';$p('pPaid').value='0';$p('pNotes').value='';$p('pLines').innerHTML='';purchaseAddLine();await purchaseLoad();await loadItems?.();if(window.sunshineFillPurchaseInvoiceNumber)window.sunshineFillPurchaseInvoiceNumber()};
- window.purchaseLoad=async function(){if(!window.sb)return;const [s,i,h,b]=await Promise.all([sb.from('suppliers').select('id,name,phone').order('name'),sb.from('items').select('id,name').order('name'),sb.from('import_shipments').select('id,name').order('created_at',{ascending:false}),sb.from('purchases').select('id,invoice_number,purchase_date,supplier_id,shipment_id,total_amount,paid_amount,remaining_amount').order('created_at',{ascending:false})]);if(s.error){pMsg('جدول الموردين: '+s.error.message,false);return}if(i.error){pMsg('جدول الأصناف: '+i.error.message,false);return}if(h.error){pMsg('جدول الشحنات: '+h.error.message,false);return}if(b.error){pMsg('جدول المشتريات: '+b.error.message,false);return}pSuppliers=s.data||[];pItems=i.data||[];pShipments=h.data||[];const opts=pSuppliers.map(x=>`<option value="${x.id}">${safeP(x.name)}</option>`).join('');$p('pSupplier').innerHTML='<option value="">اختر المورد</option>'+opts;$p('pLedgerSupplier').innerHTML='<option value="">اختر المورد</option>'+opts;$p('pShipment').innerHTML='<option value="">بدون ربط</option>'+pShipments.map(x=>`<option value="${x.id}">${safeP(x.name)}</option>`).join('');$p('pRows').innerHTML=(b.data||[]).map(x=>{const sup=pSuppliers.find(y=>y.id===x.supplier_id),ship=pShipments.find(y=>y.id===x.shipment_id);return `<tr><td>${safeP(x.invoice_number)}</td><td>${safeP(x.purchase_date)}</td><td>${safeP(sup?.name||'')}</td><td>${safeP(ship?.name||'—')}</td><td>${Number(x.total_amount).toLocaleString()} ج</td><td>${Number(x.paid_amount).toLocaleString()} ج</td><td>${Number(x.remaining_amount).toLocaleString()} ج</td><td><button type="button" class="secondary" onclick="purchasePrintInvoice('${String(x.id)}')">PDF</button> <button type="button" style="background:#168b55" onclick="purchaseWhatsAppInvoice('${String(x.id)}')">واتساب</button></td></tr>`}).join('')||'<tr><td colspan="8">لا توجد فواتير مشتريات.</td></tr>';if(!$p('pLines').children.length)purchaseAddLine();if(window.sunshineFillPurchaseInvoiceNumber)window.sunshineFillPurchaseInvoiceNumber()};
+ window.purchaseSave=async function(){if(role!=='admin'){pMsg('فواتير المشتريات متاحة للمدير فقط',false);return}if(!window.sb){pMsg('اتصال قاعدة البيانات غير متاح',false);return}const items=[...document.querySelectorAll('#pLines .grid')].map(r=>({item_id:Number(r.querySelector('.pItem').value),quantity:Number(r.querySelector('.pQty').value),unit_price:Number(r.querySelector('.pPrice').value)}));if(!items.length||items.some(x=>!x.item_id||x.quantity<=0||x.unit_price<0)){pMsg('اختر صنفًا وأدخل كمية وسعرًا صحيحين لكل سطر',false);return}const payload={invoice_number:$p('pInvoiceNo').value.trim(),purchase_date:$p('pDate').value,supplier_id:$p('pSupplier').value,shipment_id:$p('pShipment').value||null,paid_amount:Number($p('pPaid').value||0),notes:$p('pNotes').value,items};if(!payload.invoice_number||!payload.supplier_id){pMsg('رقم الفاتورة واختيار المورد مطلوبان',false);return}const {error}=await sb.rpc('admin_save_purchase_invoice',{p_invoice:payload});if(error){pMsg('تعذر الحفظ: '+error.message,false);return}pMsg('تم حفظ الفاتورة وترحيل كمياتها للمخزون وتحديث كشف المورد مرة واحدة.',true);$p('pInvoiceNo').value='';$p('pPaid').value='0';$p('pNotes').value='';$p('pLines').innerHTML='';purchaseAddLine();await purchaseLoad();await loadItems?.()};
+ window.purchaseLoad=async function(){if(!window.sb)return;const [s,i,h,b]=await Promise.all([sb.from('suppliers').select('id,name,phone').order('name'),sb.from('items').select('id,name').order('name'),sb.from('import_shipments').select('id,name').order('created_at',{ascending:false}),sb.from('purchases').select('id,invoice_number,purchase_date,supplier_id,shipment_id,total_amount,paid_amount,remaining_amount').order('created_at',{ascending:false})]);if(s.error){pMsg('جدول الموردين: '+s.error.message,false);return}if(i.error){pMsg('جدول الأصناف: '+i.error.message,false);return}if(h.error){pMsg('جدول الشحنات: '+h.error.message,false);return}if(b.error){pMsg('جدول المشتريات: '+b.error.message,false);return}pSuppliers=s.data||[];pItems=i.data||[];pShipments=h.data||[];const opts=pSuppliers.map(x=>`<option value="${x.id}">${safeP(x.name)}</option>`).join('');$p('pSupplier').innerHTML='<option value="">اختر المورد</option>'+opts;$p('pLedgerSupplier').innerHTML='<option value="">اختر المورد</option>'+opts;$p('pShipment').innerHTML='<option value="">بدون ربط</option>'+pShipments.map(x=>`<option value="${x.id}">${safeP(x.name)}</option>`).join('');$p('pRows').innerHTML=(b.data||[]).map(x=>{const sup=pSuppliers.find(y=>y.id===x.supplier_id),ship=pShipments.find(y=>y.id===x.shipment_id);return `<tr><td>${safeP(x.invoice_number)}</td><td>${safeP(x.purchase_date)}</td><td>${safeP(sup?.name||'')}</td><td>${safeP(ship?.name||'—')}</td><td>${Number(x.total_amount).toLocaleString()} ج</td><td>${Number(x.paid_amount).toLocaleString()} ج</td><td>${Number(x.remaining_amount).toLocaleString()} ج</td><td><button type="button" class="secondary" onclick="purchasePrintInvoice('${String(x.id)}')">PDF</button> <button type="button" style="background:#168b55" onclick="purchaseWhatsAppInvoice('${String(x.id)}')">واتساب</button></td></tr>`}).join('')||'<tr><td colspan="8">لا توجد فواتير مشتريات.</td></tr>';if(!$p('pLines').children.length)purchaseAddLine()};
  window.purchasePrintInvoice=async function(id){
  const {data:inv,error}=await sb.from('purchases').select('id,invoice_number,purchase_date,supplier_id,total_amount,paid_amount,remaining_amount').eq('id',id).single();
  if(error){alert('تعذر تحميل فاتورة الشراء: '+error.message);return}
@@ -803,16 +803,6 @@ window.purchaseLoadLedger=async function(){const id=Number($p('pLedgerSupplier')
  const oldSettings=window.loadCompanySettings;
  window.loadCompanySettings=async function(){await oldSettings();if(role!=='admin')return;
   $('placeholder').insertAdjacentHTML('beforeend',`<div class="finance-section"><h3>إدارة حسابات الموظفين</h3><p class="finance-note">إنشاء الحسابات وعرضها وحذفها متاح للمدير فقط. الحذف يزيل حساب دخول الموظف نهائيًا ولا يحذف فواتير أو حركاته التجارية.</p><div class="finance-form"><div><label>اسم الموظف</label><input id="empName" autocomplete="off"></div><div><label>اسم المستخدم</label><input id="empUsername" autocomplete="off"></div><div><label>كلمة مرور مؤقتة (8 أحرف على الأقل)</label><input id="empPassword" type="password" autocomplete="new-password"></div></div><div class="finance-actions"><button type="button" onclick="sunshineCreateEmployee()">إنشاء حساب الموظف</button><button type="button" class="secondary" onclick="sunshineLoadEmployees()">تحديث قائمة الموظفين</button></div><p id="empMsg" class="msg"></p><h4>حسابات الموظفين</h4><div class="scroll"><table><thead><tr><th>اسم الموظف</th><th>اسم المستخدم</th><th>الإجراء</th></tr></thead><tbody id="employeeRows"><tr><td colspan="3">جارٍ تحميل الحسابات...</td></tr></tbody></table></div><p class="muted">الحذف نهائي لحساب الدخول. تأكد من اختيار الموظف الصحيح قبل التأكيد.</p></div>`);
-  // Reset controls appear ONLY on the manager settings page.
-  $('placeholder').insertAdjacentHTML('beforeend',`<div class="finance-section" id="sunshineResetPanel" data-admin="1" style="border:2px solid #b42318">
-    <h3 style="color:#b42318">تصفير بيانات التشغيل — المدير فقط</h3>
-    <p class="finance-note">سيتم مسح فواتير البيع والشراء وتفاصيلها، كشوف وحركات العملاء والموردين، سندات القبض والصرف والتحويلات، الشيكات، والمصروفات. <b>لن يتم مسح العملاء أو الموردين أو عناوينهم أو هواتفهم، الأصناف وأسعارها وأرصدة المخزون، شحنات الاستيراد، الحسابات البنكية، حسابات الموظفين والمدير، إعدادات الشركة أو الشعار.</b></p>
-    <p class="muted">قبل التصفير مباشرةً، سيطلب المتصفح تحديد سطح المكتب ويُنشئ مجلد Sunshine ERP Backup لحفظ نسخة JSON من جداول التطبيق. يلزم كمبيوتر Windows ومتصفح Chrome أو Edge، مع السماح بالوصول للمجلد. لا يتم التصفير إذا فشل الحفظ.</p>
-    <label for="resetAdminPassword">أدخل كلمة مرور المدير لتأكيد الهوية</label>
-    <input id="resetAdminPassword" type="password" autocomplete="off" placeholder="كلمة مرور المدير" style="max-width:330px">
-    <div class="finance-actions"><button id="sunshineResetButton" type="button" style="background:#b42318" onclick="sunshineAdminReset()">نسخة احتياطية على سطح المكتب ثم تصفير البرنامج</button></div>
-    <p id="sunshineResetMsg" class="msg" role="status" aria-live="polite"></p>
-  </div>`);
   await sunshineLoadEmployees();
  };
  window.sunshineEmployeeApi=async function(action,userId=null,extra={}){
@@ -871,81 +861,57 @@ window.purchaseLoadLedger=async function(){const id=Number($p('pLedgerSupplier')
 </script>
 
 <script>
-/* Sunshine ERP: manager-only reset, desktop backup, and purchase invoice numbering. */
+/* Sunshine ERP safe admin reset + downloadable pre-reset backup */
 (function(){
-  const el=id=>document.getElementById(id);
-  const status=(message,good=false)=>{
-    const target=el('sunshineResetMsg');
-    if(target){target.textContent=message;target.className='msg '+(good?'ok':'error')}
-  };
-  window.sunshineFillPurchaseInvoiceNumber=async function(){
-    if(role!=='admin'||!sb||!el('pInvoiceNo')||el('pInvoiceNo').value.trim())return;
-    const {data,error}=await sb.rpc('next_purchase_invoice_number');
-    if(!error&&el('pInvoiceNo')&&!el('pInvoiceNo').value.trim())el('pInvoiceNo').value=data;
-  };
-  window.sunshineAdminReset=async function(){
-    if(role!=='admin'||!sb){alert('التصفير متاح للمدير فقط.');return}
-    const button=el('sunshineResetButton'),passwordInput=el('resetAdminPassword');
-    if(!button||button.disabled)return;
-    const password=passwordInput?.value||'';
-    if(!password){status('أدخل كلمة مرور المدير أولاً.');return}
-    if(typeof window.showDirectoryPicker!=='function'){
-      status('لضمان النسخ الاحتياطي على سطح المكتب قبل الحذف، افتح النظام من Windows عبر Chrome أو Edge (HTTPS). لا يمكن تنفيذ التصفير من هذا المتصفح.');return;
-    }
-    if(!confirm('تحذير: ستُحذف الفواتير والحركات المالية والشيكات والمصروفات نهائياً بعد حفظ النسخة الاحتياطية. سيتم الاحتفاظ بالعملاء والأصناف والمخزون وشحنات الاستيراد والحسابات وإعدادات الشركة. هل تريد بدء النسخ الاحتياطي؟'))return;
-    // Picker must run directly from the button click before the first await.
-    let desktop;
-    try{desktop=await window.showDirectoryPicker({id:'sunshine-erp-reset',mode:'readwrite',startIn:'desktop'});}
-    catch(err){status('تم إلغاء اختيار سطح المكتب أو رفض الإذن. لم تُحذف أي بيانات.');return}
-    button.disabled=true;
-    button.textContent='جارٍ التحقق والنسخ الاحتياطي...';
-    try{
-      status('جارٍ التحقق من كلمة مرور المدير...');
-      const {data:userInfo,error:userError}=await sb.auth.getUser();
-      if(userError||!userInfo?.user?.email)throw new Error('تعذر التحقق من حساب المدير.');
-      const {error:loginError}=await sb.auth.signInWithPassword({email:userInfo.user.email,password});
-      if(loginError)throw new Error('كلمة مرور المدير غير صحيحة.');
-      const {data:serverRole,error:roleError}=await sb.rpc('current_user_role');
-      if(roleError||serverRole!=='admin')throw new Error('ليس لديك صلاحية المدير.');
-      if(passwordInput)passwordInput.value='';
-      status('جارٍ إعداد نسخة من جميع جداول التطبيق العامة...');
-      const {data:prepared,error:prepareError}=await sb.rpc('admin_prepare_reset');
-      if(prepareError)throw new Error('تعذر إعداد النسخة الاحتياطية: '+prepareError.message+' — شغّل ملف SQL المرفق أولاً.');
-      if(!prepared?.token||!prepared?.digest||typeof prepared.backup_text!=='string')throw new Error('استجابة النسخ الاحتياطي غير مكتملة.');
-      const folder=await desktop.getDirectoryHandle('Sunshine ERP Backup',{create:true});
-      const stamp=new Date().toLocaleString('sv-SE',{timeZone:'Africa/Cairo'}).replace(' ','_').replace(/:/g,'-');
-      const filename='Sunshine_ERP_Backup_'+stamp+'_'+prepared.token.slice(0,8)+'.json';
-      const fileHandle=await folder.getFileHandle(filename,{create:true});
-      const payload=new Blob([prepared.backup_text],{type:'application/json;charset=utf-8'});
-      let writable;
-      try{
-        writable=await fileHandle.createWritable();
-        await writable.write(payload);
-        await writable.close();
-        writable=null;
-      }finally{if(writable)await writable.abort().catch(()=>{})}
-      const saved=await fileHandle.getFile();
-      if(saved.size!==payload.size||saved.size===0)throw new Error('لم يكتمل حفظ ملف النسخة الاحتياطية.');
-      status('تم حفظ النسخة والتحقق من حجمها داخل Sunshine ERP Backup في المجلد الذي اخترته.',true);
-      if(!confirm('تم حفظ '+filename+' بنجاح. هل تريد تنفيذ حذف السجلات الآن؟')){
-        status('تم حفظ النسخة الاحتياطية فقط. تم إلغاء التصفير.',true);return;
-      }
-      if(prompt('التأكيد الأخير: اكتب RESET بالإنجليزية لتنفيذ التصفير:','')!=='RESET'){
-        status('لم تُحذف أي بيانات. النسخة الاحتياطية محفوظة.',true);return;
-      }
-      status('جارٍ التصفير الآمن. لا تغلق الصفحة...');
-      const {data:result,error:resetError}=await sb.rpc('admin_reset_business_data',{
-        p_token:prepared.token,p_backup_digest:prepared.digest
-      });
-      if(resetError)throw new Error('أوقف الخادم التصفير: '+resetError.message);
-      if(!result?.success)throw new Error('لم يؤكد الخادم اكتمال التصفير.');
-      status('تم التصفير بنجاح. رقم فاتورة البيع التالية: '+result.next_invoice,true);
-      alert('تم التصفير بنجاح. النسخة الاحتياطية: Sunshine ERP Backup / '+filename+'\nفاتورة البيع التالية: '+result.next_invoice);
-      location.reload();
-    }catch(err){status((err?.message||String(err))+' — إذا لم تظهر رسالة نجاح، راجع حالة قاعدة البيانات قبل إعادة المحاولة.');}
-    finally{button.disabled=false;button.textContent='نسخة احتياطية على سطح المكتب ثم تصفير البرنامج'}
-  };
+ const $=id=>document.getElementById(id);
+ const oldLoad=window.loadCompanySettings;
+ window.loadCompanySettings=async function(){
+   await oldLoad();
+   if(role!=='admin')return;
+   const host=$('placeholder'); if(!host || $('sunshineResetPanel'))return;
+   host.insertAdjacentHTML('beforeend', `
+   <section id="sunshineResetPanel" class="finance-section" style="border:2px solid #a11;border-radius:14px;padding:18px;margin-top:18px">
+    <h3 style="color:#8b2020">تصفير بيانات التشغيل — المدير فقط</h3>
+    <p class="muted" style="line-height:1.9">سيتم حذف فواتير البيع وتفاصيلها وكشف حساب العملاء والمصروفات التشغيلية فقط. لن يتم حذف الشيكات أو فواتير المشتريات أو تفاصيلها أو حسابات الموردين أو حركاتها أو الحسابات البنكية. سيتم الاحتفاظ بحسابات المدير والموظفين، إعدادات الشركة والشعار، بيانات العملاء والموردين، الأصناف وأسعار البيع والشراء، وشحنات الاستيراد، مع الاحتفاظ بكميات المخزون الحالية كما هي دون أي تغيير.</p>
+    <p class="muted">قبل التصفير، نزّل نسخة احتياطية JSON من بيانات النظام. سيبدأ تنزيل الملف عبر المتصفح؛ اختر سطح المكتب مكانًا للحفظ إذا لم يكن التنزيل مضبوطًا عليه.</p>
+    <div class="finance-actions"><button type="button" class="secondary" id="sunshineBackupBtn" onclick="sunshineDownloadPreResetBackup()">تنزيل نسخة احتياطية قبل التصفير</button></div>
+    <label for="sunshineResetPassword">أدخل كلمة مرور المدير للتأكيد</label><input id="sunshineResetPassword" type="password" autocomplete="current-password" placeholder="كلمة مرور المدير">
+    <div class="finance-actions"><button type="button" id="sunshineResetBtn" style="background:#a11" onclick="sunshineRunSafeReset()">نسخة احتياطية ثم تصفير البرنامج</button></div>
+    <p id="sunshineResetMsg" class="msg" role="status"></p>
+   </section>`);
+ };
+ const backupTables=['customers','suppliers','items','import_shipments','sales','sale_items','purchases','purchase_items','customer_transactions','supplier_ledger','account_transactions','bank_accounts','operating_expenses','company_checks','company_settings','user_roles'];
+ window.sunshineDownloadPreResetBackup=async function(){
+   if(role!=='admin'){alert('هذه العملية متاحة للمدير فقط');return}
+   const msg=$('sunshineResetMsg'),btn=$('sunshineBackupBtn'); if(btn){btn.disabled=true;btn.textContent='جارٍ تجهيز النسخة...'}
+   try{
+     const backup={system:'Sunshine ERP',created_at:new Date().toISOString(),note:'نسخة احتياطية قبل التصفير',tables:{}};
+     for(const table of backupTables){const {data,error}=await sb.from(table).select('*');if(error){if(['company_checks','operating_expenses','user_roles'].includes(table)&&/does not exist|relation .* not found/i.test(error.message)){backup.tables[table]=[];continue}throw new Error('تعذر نسخ جدول '+table+': '+error.message)}backup.tables[table]=data||[];}
+     const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Sunshine_ERP_Backup_'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
+     if(msg){msg.textContent='تم تجهيز النسخة الاحتياطية وبدء تنزيلها. تأكد من وجود الملف على الكمبيوتر قبل التصفير.';msg.className='msg ok'}
+   }catch(e){if(msg){msg.textContent=e.message||String(e);msg.className='msg error'}}
+   finally{if(btn){btn.disabled=false;btn.textContent='تنزيل نسخة احتياطية قبل التصفير'}}
+ };
+ window.sunshineRunSafeReset=async function(){
+   if(role!=='admin'){alert('التصفير متاح للمدير فقط');return}
+   const password=$('sunshineResetPassword')?.value||'';if(!password){$('sunshineResetMsg').textContent='أدخل كلمة مرور المدير أولاً.';return}
+   if(!confirm('تحذير نهائي: سيتم حذف فواتير البيع وتفاصيلها وكشف حساب العملاء والمصروفات التشغيلية فقط. ستبقى جميع الشيكات وفواتير المشتريات وتفاصيلها وكشوف الموردين والحسابات البنكية وحركاتها، وكذلك بيانات العملاء والموردين والأصناف وكميات المخزون وأسعار البيع والشراء والشحنات وحسابات الدخول وإعدادات الشركة. هل تريد المتابعة؟'))return;
+   const btn=$('sunshineResetBtn'),msg=$('sunshineResetMsg');btn.disabled=true;btn.textContent='جارٍ إنشاء النسخة الاحتياطية...';
+   try{
+     // Always download a fresh backup immediately before the reset RPC.
+     await sunshineDownloadPreResetBackup();
+     if(msg.textContent.startsWith('تعذر')||msg.className.includes('error'))throw new Error(msg.textContent);
+     const {data:{user},error:userError}=await sb.auth.getUser();if(userError||!user?.email)throw new Error('تعذر التحقق من حساب المدير.');
+     const {error:authError}=await sb.auth.signInWithPassword({email:user.email,password});if(authError)throw new Error('كلمة مرور المدير غير صحيحة.');
+     msg.textContent='جارٍ تصفير بيانات التشغيل...';msg.className='msg';
+     const {data,error}=await sb.rpc('admin_reset_business_data');if(error)throw error;
+     if(!data?.success)throw new Error('لم تؤكد قاعدة البيانات نجاح التصفير.');
+     $('sunshineResetPassword').value='';msg.textContent='تم تصفير بيانات التشغيل بنجاح. احتفظ بملف النسخة الاحتياطية الذي تم تنزيله.';msg.className='msg ok';
+     await loadItems();await loadCustomers();await loadNextInvoiceNumber();
+     if(window.loadAdminProfitDashboard)await window.loadAdminProfitDashboard();
+   }catch(e){msg.textContent='لم يتم إكمال التصفير: '+(e.message||String(e));msg.className='msg error'}
+   finally{btn.disabled=false;btn.textContent='نسخة احتياطية ثم تصفير البرنامج'}
+ };
 })();
-
 </script>
 </body></html>

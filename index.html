@@ -242,102 +242,7 @@ function invoicePrintWindow(title, subtitle, rows, totals, companyContact=''){
   const w=window.open('','_blank','width=900,height=700');
   if(!w){alert('اسمح بفتح النوافذ المنبثقة من المتصفح ثم أعد المحاولة.');return}
   const escPrint=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${escPrint(title)}</title><style>body{font-family:Arial,Tahoma,sans-serif;padding:28px;color:#222;font-weight:600}h2{color:#a90d58;margin-bottom:5px;font-weight:800}.print-brand{display:flex;align-items:center;gap:16px;border-bottom:3px solid #d41470;padding-bottom:12px}.print-brand{min-height:220px;justify-content:center;gap:28px}.print-brand img{width:240px;height:210px;max-width:42%;object-fit:contain}.print-brand h2{font-size:30px}.print-brand h2{margin:0}.sub{color:#666;border-bottom:2px solid #d41470;padding-bottom:14px}table{width:100%;border-collapse:collapse;margin-top:22px}th,td{border:1px solid #aaa;padding:10px;text-align:right}th{background:#fceaf2}.totals{margin-top:20px;line-height:2;font-weight:bold}@media print{button{display:none}}</style></head><body><div class="print-brand"><img src="sunshine-logo.png" alt="شعار صن شاين" onerror="this.style.display='none'"><div><h2>صن شاين للاستيراد والتصدير</h2><div style="font-size:13px;line-height:1.8;margin-top:8px">${escPrint(companyContact)}</div></div></div><h3>${escPrint(title)}</h3><div style="font-weight:700;margin:6px 0 10px">وقت الطباعة: ${escPrint(new Date().toLocaleTimeString("ar-EG",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:true}))}</div><div class="sub">${escPrint(subtitle)}</div><table><thead><tr><th>الصنف</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${escPrint(r.name)}</td><td>${escPrint(r.qty)}</td><td>${escPrint(r.price)}</td><td>${escPrint(r.total)}</td></tr>`).join('')}</tbody></table><div class="totals">${totals.map(t=>`<div>${escPrint(t)}</div>`).join('')}</div><p style="margin-top:35px">شكراً لتعاملكم معنا.</p><button onclick="window.print()">طباعة / حفظ PDF</button><script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script>
-<script>
-
-/* Sunshine HR - lightweight employee and daily attendance module (manager only). */
-(function(){
- const $=id=>document.getElementById(id);
- const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const today=()=>new Date().toISOString().slice(0,10);
- let staff=[];
- function ensureNav(){
-  if($('hrNavBtn')){$('hrNavBtn').classList.remove('hidden');return}
-  const b=document.createElement('button');b.id='hrNavBtn';
-  b.innerHTML='<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M18 8v6m-3-3h6"/></svg><span>شؤون الموظفين والحضور</span>';
-  b.addEventListener('click',()=>window.openPage('hr',b));$('nav')?.appendChild(b);
-  b.classList.remove('hidden');
- }
- function render(){
-  const host=$('placeholder');if(!host)return;
-  host.classList.remove('hidden');host.classList.add('finance-page');
-  $('pageTitle').textContent='شؤون الموظفين والحضور';
-  if(role!=='admin'){renderEmployeeAttendance();return;}
-  host.innerHTML=`<section class="finance-section"><h3>إضافة موظف</h3><div class="finance-form"><div><label>اسم الموظف</label><input id="hrName" placeholder="اسم الموظف"></div><div><label>اسم الدخول للموظف</label><input id="hrUsername" placeholder="نفس اسم المستخدم عند تسجيل الدخول"></div><div><label>رقم الهاتف</label><input id="hrPhone" placeholder="رقم الهاتف"></div><div><label>الوظيفة</label><input id="hrJob" placeholder="الوظيفة"></div></div><div class="finance-actions"><button type="button" onclick="sunshineHRAddEmployee()">حفظ الموظف</button></div><p id="hrMsg" class="msg"></p></section>
-  <section class="finance-section"><div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;justify-content:space-between"><div><h3>الحضور والغياب اليومي</h3><label for="hrDate">التاريخ</label><input id="hrDate" type="date" value="${today()}" onchange="sunshineHRLoadAttendance()" style="max-width:220px"></div><div class="finance-actions"><button type="button" class="secondary" onclick="sunshineHRLoadAttendance()">تحديث</button><button type="button" onclick="sunshineHRSaveAttendance()">حفظ الحضور</button></div></div><div class="finance-stats"><div class="finance-stat"><b>حاضر</b><strong id="hrPresent">0</strong></div><div class="finance-stat"><b>غائب</b><strong id="hrAbsent">0</strong></div><div class="finance-stat"><b>إجازة</b><strong id="hrLeave">0</strong></div></div><div class="scroll"><table><thead><tr><th>الموظف</th><th>الوظيفة</th><th>الحالة</th><th>ملاحظات</th></tr></thead><tbody id="hrAttendanceRows"><tr><td colspan="4">جارٍ التحميل...</td></tr></tbody></table></div><p class="muted">اختر حالة كل موظف ثم اضغط «حفظ الحضور». يمكن تعديل السجل لنفس اليوم دون إنشاء حركة مكررة.</p></section>
-  <section class="finance-section"><h3>قائمة الموظفين</h3><div class="scroll"><table><thead><tr><th>اسم الموظف</th><th>الهاتف</th><th>الوظيفة</th><th>الحالة</th></tr></thead><tbody id="hrStaffRows"></tbody></table></div></section>`;
-  $('hrDate').value=today();
- }
- async function loadStaff(){
-  const {data,error}=await sb.from('hr_employees').select('id,name,phone,job_title,is_active').order('name');
-  if(error)throw error;staff=data||[];
-  $('hrStaffRows').innerHTML=staff.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.phone||'—')}</td><td>${esc(x.job_title||'—')}</td><td>${x.is_active?'نشط':'موقوف'}</td></tr>`).join('')||'<tr><td colspan="4">أضف الموظفين أولاً.</td></tr>';
- }
- window.sunshineHRAddEmployee=async function(){
-  if(role!=='admin')return alert('هذه الصفحة متاحة للمدير فقط');
-  const name=$('hrName')?.value.trim();if(!name){$('hrMsg').textContent='اكتب اسم الموظف.';return}
-  const username=$('hrUsername').value.trim().toLowerCase();if(!username){$('hrMsg').textContent='أدخل اسم الدخول المطابق لحساب الموظف.';return}
-  const {error}=await sb.from('hr_employees').insert({name,login_username:username,phone:$('hrPhone').value.trim()||null,job_title:$('hrJob').value.trim()||null});
-  if(error){$('hrMsg').textContent='تعذر حفظ الموظف: '+error.message;$('hrMsg').className='msg error';return}
-  ['hrName','hrUsername','hrPhone','hrJob'].forEach(id=>$(id).value='');$('hrMsg').textContent='تم حفظ الموظف.';$('hrMsg').className='msg ok';await loadStaff();await window.sunshineHRLoadAttendance();
- };
- window.sunshineHRLoadAttendance=async function(){
-  if(role!=='admin')return;
-  try{
-   await loadStaff();const date=$('hrDate')?.value||today();
-   const {data,error}=await sb.from('hr_attendance').select('employee_id,status,notes').eq('work_date',date);
-   if(error)throw error;const records=new Map((data||[]).map(x=>[String(x.employee_id),x]));
-   const active=staff.filter(x=>x.is_active);
-   $('hrAttendanceRows').innerHTML=active.map(x=>{const a=records.get(String(x.id));return `<tr data-employee="${x.id}"><td>${esc(x.name)}</td><td>${esc(x.job_title||'—')}</td><td><select class="hr-status"><option value="present" ${(!a||a.status==='present')?'selected':''}>حاضر</option><option value="absent" ${a?.status==='absent'?'selected':''}>غائب</option><option value="leave" ${a?.status==='leave'?'selected':''}>إجازة</option></select></td><td><input class="hr-notes" value="${esc(a?.notes||'')}" placeholder="ملاحظات"></td></tr>`}).join('')||'<tr><td colspan="4">لا يوجد موظفون نشطون.</td></tr>';
-   updateCounts();document.querySelectorAll('#hrAttendanceRows .hr-status').forEach(el=>el.addEventListener('change',updateCounts));
-  }catch(e){$('hrAttendanceRows').innerHTML=`<tr><td colspan="4">تعذر تحميل الحضور: ${esc(e.message||e)}</td></tr>`}
- };
- function updateCounts(){const rows=[...document.querySelectorAll('#hrAttendanceRows tr[data-employee]')];const n=s=>rows.filter(r=>r.querySelector('.hr-status')?.value===s).length;$('hrPresent').textContent=n('present');$('hrAbsent').textContent=n('absent');$('hrLeave').textContent=n('leave')}
- window.sunshineHRSaveAttendance=async function(){
-  if(role!=='admin')return alert('هذه الصفحة متاحة للمدير فقط');
-  const date=$('hrDate').value||today();const rows=[...document.querySelectorAll('#hrAttendanceRows tr[data-employee]')];if(!rows.length){$('hrMsg').textContent='لا يوجد موظفون لتسجيل الحضور.';return}
-  const payload=rows.map(r=>({employee_id:Number(r.dataset.employee),work_date:date,status:r.querySelector('.hr-status').value,notes:r.querySelector('.hr-notes').value.trim()||null,updated_at:new Date().toISOString()}));
-  const {error}=await sb.from('hr_attendance').upsert(payload,{onConflict:'employee_id,work_date'});
-  $('hrMsg').textContent=error?'تعذر حفظ الحضور: '+error.message:'تم حفظ الحضور والغياب بتاريخ '+date;$('hrMsg').className='msg '+(error?'error':'ok');updateCounts();
- };
- function renderEmployeeAttendance(){
-  const host=$('placeholder');host.classList.remove('hidden');host.classList.add('finance-page');$('pageTitle').textContent='إثبات الحضور والانصراف';
-  host.innerHTML=`<section class="finance-section"><h3>تسجيل الحضور والانصراف</h3><p class="muted">يمكنك تسجيل حضورك عند بداية العمل، ثم تسجيل الانصراف عند نهاية العمل فقط.</p><div class="finance-stats"><div class="finance-stat"><b>تاريخ اليوم</b><strong id="empTodayDate">—</strong></div><div class="finance-stat"><b>وقت الحضور</b><strong id="empCheckIn">لم يسجل</strong></div><div class="finance-stat"><b>وقت الانصراف</b><strong id="empCheckOut">لم يسجل</strong></div></div><div class="finance-actions"><button id="empCheckInBtn" onclick="sunshineHREmployeePunch('in')">إثبات الحضور</button><button id="empCheckOutBtn" class="secondary" onclick="sunshineHREmployeePunch('out')">إثبات الانصراف</button></div><p id="empAttendanceMsg" class="msg"></p></section>`;
-  window.sunshineHRRefreshEmployee();
- }
- window.sunshineHRRefreshEmployee=async function(){
-  $('empTodayDate').textContent=new Date().toLocaleDateString('ar-EG');
-  const {data,error}=await sb.rpc('hr_employee_today_status');
-  if(error){$('empAttendanceMsg').textContent='تعذر تحميل سجل حضورك: '+error.message;$('empAttendanceMsg').className='msg error';return;}
-  const row=Array.isArray(data)?data[0]:data;
-  if(!row){$('empAttendanceMsg').textContent='لا يوجد ملف موظف مرتبط بحساب الدخول. تواصل مع المدير.';$('empAttendanceMsg').className='msg error';$('empCheckInBtn').disabled=true;$('empCheckOutBtn').disabled=true;return;}
-  $('empCheckIn').textContent=row.check_in_at?new Date(row.check_in_at).toLocaleTimeString('ar-EG'):'لم يسجل';
-  $('empCheckOut').textContent=row.check_out_at?new Date(row.check_out_at).toLocaleTimeString('ar-EG'):'لم يسجل';
-  $('empCheckInBtn').disabled=!!row.check_in_at;$('empCheckOutBtn').disabled=!row.check_in_at||!!row.check_out_at;
-  $('empAttendanceMsg').textContent='مرحبًا '+row.employee_name+' — '+(row.check_out_at?'تم تسجيل الحضور والانصراف اليوم.':row.check_in_at?'تم تسجيل حضورك، سجّل الانصراف عند المغادرة.':'لم يتم تسجيل حضورك اليوم.');$('empAttendanceMsg').className='msg ok';
- };
- window.sunshineHREmployeePunch=async function(kind){
-  const fn=kind==='in'?'hr_employee_check_in':'hr_employee_check_out';
-  const {error}=await sb.rpc(fn);
-  if(error){$('empAttendanceMsg').textContent='لم يتم التسجيل: '+error.message;$('empAttendanceMsg').className='msg error';return;}
-  $('empAttendanceMsg').textContent=kind==='in'?'تم إثبات حضورك بنجاح.':'تم إثبات انصرافك بنجاح.';$('empAttendanceMsg').className='msg ok';await window.sunshineHRRefreshEmployee();
- };
- const previousOpen=window.openPage;
- window.openPage=function(id,btn){
-  if(id==='hr'){
-   document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');
-   ['dashboard','items','shipments','sales','customers','placeholder'].forEach(x=>$(x)?.classList.add('hidden'));
-   render();if(role==='admin')window.sunshineHRLoadAttendance();return;
-  }
-  return previousOpen.call(this,id,btn);
- };
- const oldEnter=window.enterApp;
- if(typeof oldEnter==='function')window.enterApp=async function(){const r=await oldEnter.apply(this,arguments);ensureNav();return r};
- document.addEventListener('DOMContentLoaded',ensureNav);
-})();
-
-</script>
-</body></html>`);
+  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${escPrint(title)}</title><style>body{font-family:Arial,Tahoma,sans-serif;padding:28px;color:#222;font-weight:600}h2{color:#a90d58;margin-bottom:5px;font-weight:800}.print-brand{display:flex;align-items:center;gap:16px;border-bottom:3px solid #d41470;padding-bottom:12px}.print-brand{min-height:220px;justify-content:center;gap:28px}.print-brand img{width:240px;height:210px;max-width:42%;object-fit:contain}.print-brand h2{font-size:30px}.print-brand h2{margin:0}.sub{color:#666;border-bottom:2px solid #d41470;padding-bottom:14px}table{width:100%;border-collapse:collapse;margin-top:22px}th,td{border:1px solid #aaa;padding:10px;text-align:right}th{background:#fceaf2}.totals{margin-top:20px;line-height:2;font-weight:bold}@media print{button{display:none}}</style></head><body><div class="print-brand"><img src="sunshine-logo.png" alt="شعار صن شاين" onerror="this.style.display='none'"><div><h2>صن شاين للاستيراد والتصدير</h2><div style="font-size:13px;line-height:1.8;margin-top:8px">${escPrint(companyContact)}</div></div></div><h3>${escPrint(title)}</h3><div style="font-weight:700;margin:6px 0 10px">وقت الطباعة: ${escPrint(new Date().toLocaleTimeString("ar-EG",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:true}))}</div><div class="sub">${escPrint(subtitle)}</div><table><thead><tr><th>الصنف</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${escPrint(r.name)}</td><td>${escPrint(r.qty)}</td><td>${escPrint(r.price)}</td><td>${escPrint(r.total)}</td></tr>`).join('')}</tbody></table><div class="totals">${totals.map(t=>`<div>${escPrint(t)}</div>`).join('')}</div><p style="margin-top:35px">شكراً لتعاملكم معنا.</p><button onclick="window.print()">طباعة / حفظ PDF</button><script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script></body></html>`);
   w.document.close();
 }
 window.printArchivedSale=async function(id){
@@ -783,13 +688,13 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
  <div><label>تاريخ الفاتورة</label><input id="pDate" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
  <div><label>المورد *</label><select id="pSupplier"><option value="">اختر المورد</option></select></div>
  <div><label>ربط بشحنة استيراد (اختياري)</label><select id="pShipment"><option value="">بدون ربط</option></select></div>
- <div><label>عملة الفاتورة</label><select id="pCurrency"><option value="EGP">جنيه مصري (EGP)</option><option value="USD">دولار أمريكي (USD)</option></select></div>
+ <div><label>عملة الفاتورة</label><select id="pCurrency" onchange="purchaseCalc()"><option value="EGP">جنيه مصري (EGP)</option><option value="USD">دولار أمريكي (USD)</option></select></div>
  <div><label>المبلغ المدفوع بنفس العملة</label><input id="pPaid" type="number" min="0" step="0.01" value="0"></div>
  <div><label>ملاحظات</label><input id="pNotes"></div></div>
  <h4>أصناف الفاتورة</h4><div id="pLines"></div><button type="button" class="secondary" onclick="purchaseAddLine()">+ إضافة صنف</button>
  <p>إجمالي الفاتورة: <b id="pTotal">0.00</b></p><div class="invoice-actions"><button id="pSaveBtn" type="button" onclick="purchaseSave()">حفظ الفاتورة وترحيل المخزون</button><button id="pCancelEditBtn" type="button" class="secondary" style="display:none" onclick="purchaseCancelEdit()">إلغاء التعديل</button><button type="button" class="secondary" onclick="purchaseLoad()">تحديث</button></div><p id="pMsg" class="msg"></p></div>
  <div class="finance-section"><h4>فواتير المشتريات</h4><div class="finance-table"><table><thead><tr><th>رقم الفاتورة</th><th>التاريخ</th><th>المورد</th><th>الشحنة</th><th>العملة</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>إجراءات</th></tr></thead><tbody id="pRows"><tr><td colspan="9">جارٍ التحميل...</td></tr></tbody></table></div></div>
- <div class="finance-section"><h4>كشف حساب المورد / تسجيل دفعة</h4><div class="grid"><div><label>المورد</label><select id="pLedgerSupplier" onchange="purchaseLoadLedger()"><option value="">اختر المورد</option></select></div><div><label>عملة الدفعة</label><select id="pPaymentCurrency" onchange="purchaseLoadLedger()"><option value="EGP">جنيه مصري (EGP)</option><option value="USD">دولار أمريكي (USD)</option></select></div><div><label>مبلغ الدفعة بنفس العملة</label><input id="pPaymentAmount" type="number" min="0.01" step="0.01"></div><div><label>وصف الدفعة</label><input id="pPaymentDesc" placeholder="سند صرف"></div></div><button type="button" onclick="purchasePaySupplier()">تسجيل دفعة للمورد</button><p id="pLedgerMsg" class="msg"></p><div class="finance-table"><table><thead><tr><th>التاريخ</th><th>البيان</th><th>العملة</th><th>مدين</th><th>دائن</th><th>الرصيد بنفس العملة</th></tr></thead><tbody id="pLedgerRows"></tbody></table></div></div>`}
+ <div class="finance-section"><h4>كشف حساب المورد / تسجيل دفعة</h4><div class="grid"><div><label>المورد</label><select id="pLedgerSupplier" onchange="purchaseLoadLedger()"><option value="">اختر المورد</option></select></div><div><label>عملة الدفعة</label><select id="pPaymentCurrency" onchange="purchaseLoadLedger()"><option value="EGP">جنيه مصري (EGP)</option><option value="USD">دولار أمريكي (USD)</option></select></div><div><label>مبلغ الدفعة بنفس العملة</label><input id="pPaymentAmount" type="number" min="0.01" step="0.01"></div><div><label>وصف الدفعة</label><input id="pPaymentDesc" placeholder="سند صرف"></div></div><button type="button" onclick="purchasePaySupplier()">تسجيل دفعة للمورد</button> <button type="button" class="secondary" onclick="purchasePrintLedger()">طباعة كشف الحساب</button><p id="pLedgerMsg" class="msg"></p><p id="pLedgerSummary" class="finance-note">اختر المورد والعملة لعرض كشف الحساب.</p><div class="finance-table"><table><thead><tr><th>التاريخ</th><th>البيان</th><th>العملة</th><th>مدين</th><th>دائن</th><th>الرصيد بنفس العملة</th></tr></thead><tbody id="pLedgerRows"></tbody></table></div></div>`}
  window.purchaseAddLine=function(){const host=$p('pLines');if(!host)return;const n=host.children.length;const div=document.createElement('div');div.className='grid';div.style.marginBottom='8px';div.innerHTML=`<div><label>الصنف</label><select class="pItem"><option value="">اختر الصنف</option>${pItems.map(x=>`<option value="${x.id}">${safeP(x.name)}</option>`).join('')}</select></div><div><label>الكمية</label><input class="pQty" type="number" min="0.001" step="0.001" value="1"></div><div><label>سعر الوحدة</label><input class="pPrice" type="number" min="0" step="0.01" value="0"></div><div><label>الإجمالي</label><input class="pLineTotal" readonly value="0.00"></div><div style="align-self:end"><button type="button" class="secondary" onclick="this.closest('.grid').remove();purchaseCalc()">حذف السطر</button></div>`;host.appendChild(div);div.querySelectorAll('input,select').forEach(x=>x.addEventListener('input',purchaseCalc));};
  window.purchaseCalc=function(){let total=0;document.querySelectorAll('#pLines .grid').forEach(r=>{const q=Number(r.querySelector('.pQty').value||0),p=Number(r.querySelector('.pPrice').value||0),t=q*p;r.querySelector('.pLineTotal').value=t.toFixed(2);total+=t});if($p('pTotal'))$p('pTotal').textContent=total.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(($p('pCurrency')?.value==='USD')?'USD':'EGP');};
  function pMsg(s,ok){if($p('pMsg')){$p('pMsg').textContent=s;$p('pMsg').className='msg '+(ok?'ok':'error')}}
@@ -814,12 +719,48 @@ window.purchaseWhatsAppInvoice=async function(id){
  const sup=pSuppliers.find(x=>String(x.id)===String(inv.supplier_id));
  const phone=normalizeWhatsAppPhone(sup?.phone);
  if(!phone){alert('لا يوجد رقم هاتف مسجل لهذا المورد. أضف رقم الهاتف من صفحة الموردين.');return}
- const message='فاتورة مشتريات - صن شاين للاستيراد والتصدير\nرقم الفاتورة: '+inv.invoice_number+'\nالتاريخ: '+inv.purchase_date+'\nالإجمالي: '+Number(inv.total_amount||0).toFixed(2)+' جنيه\nالمدفوع: '+Number(inv.paid_amount||0).toFixed(2)+' جنيه\nالمتبقي: '+Number(inv.remaining_amount||0).toFixed(2)+' جنيه\n\nيمكن إرفاق نسخة PDF بعد فتح المحادثة.';
+ const unit=inv.currency==='USD'?'دولار أمريكي':'جنيه مصري';
+ const message=['فاتورة مشتريات - صن شاين للاستيراد والتصدير','رقم الفاتورة: '+inv.invoice_number,'التاريخ: '+inv.purchase_date,'الإجمالي: '+Number(inv.total_amount||0).toFixed(2)+' '+unit,'المدفوع: '+Number(inv.paid_amount||0).toFixed(2)+' '+unit,'المتبقي: '+Number(inv.remaining_amount||0).toFixed(2)+' '+unit,'','يمكن إرفاق نسخة PDF بعد فتح المحادثة.'].join('\n');
  window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(message),'_blank','noopener');
 };
-window.purchaseLoadLedger=async function(){const id=Number($p('pLedgerSupplier').value);if(!id)return;const cur=$p('pPaymentCurrency')?.value||'EGP';const {data,error}=await sb.from('supplier_ledger').select('entry_date,entry_type,debit,credit,description,currency').eq('supplier_id',id).eq('currency',cur).order('entry_date');if(error){$p('pLedgerMsg').textContent=error.message;return}let bal=0;$p('pLedgerRows').innerHTML=(data||[]).map(x=>{bal+=Number(x.debit||0)-Number(x.credit||0);return `<tr><td>${safeP(x.entry_date)}</td><td>${safeP(x.description||x.entry_type)}</td><td>${safeP(x.currency||'EGP')}</td><td>${Number(x.debit||0).toLocaleString()}</td><td>${Number(x.credit||0).toLocaleString()}</td><td>${bal.toLocaleString()}</td></tr>`}).join('')||'<tr><td colspan="6">لا توجد حركات.</td></tr>';};
- window.purchasePaySupplier=async function(){if(role!=='admin'){alert('تسجيل دفعات الموردين متاح للمدير فقط');return}const id=Number($p('pLedgerSupplier').value),amount=Number($p('pPaymentAmount').value);if(!id||amount<=0){$p('pLedgerMsg').textContent='اختر المورد وأدخل مبلغًا صحيحًا';return}const {error}=await sb.rpc('admin_record_supplier_payment',{p_supplier_id:id,p_amount:amount,p_date:new Date().toISOString().slice(0,10),p_description:$p('pPaymentDesc').value||'سند صرف للمورد',p_currency:$p('pPaymentCurrency').value});$p('pLedgerMsg').textContent=error?'تعذر تسجيل الدفعة: '+error.message:'تم تسجيل الدفعة.';if(!error){$p('pPaymentAmount').value='';purchaseLoadLedger()}};
- window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'||!sb){alert('اتصال قاعدة البيانات غير متاح');return}document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');['dashboard','items','shipments','sales','customers'].forEach(x=>$p(x)?.classList.add('hidden'));$p('pageTitle').textContent='المشتريات';$p('placeholder').classList.remove('hidden');$p('placeholder').classList.add('finance-page');$p('placeholder').innerHTML=purchaseHtml();purchaseLoad();return}return oldOpen.call(this,id,btn)};
+window.purchaseLoadLedger=async function(){
+ const id=Number($p('pLedgerSupplier').value),cur=$p('pPaymentCurrency')?.value||'EGP';
+ if($p('pLedgerMsg'))$p('pLedgerMsg').textContent='';
+ if(!id){$p('pLedgerRows').innerHTML='<tr><td colspan="6">اختر المورد لعرض كشف الحساب.</td></tr>';$p('pLedgerSummary').textContent='';return}
+ const ledgerQuery=sb.from('supplier_ledger').select('id,entry_date,entry_type,debit,credit,description,currency').eq('supplier_id',id);
+ const filteredLedgerQuery=cur==='EGP'?ledgerQuery.or('currency.eq.EGP,currency.is.null'):ledgerQuery.eq('currency','USD');
+ const {data,error}=await filteredLedgerQuery.order('entry_date',{ascending:true}).order('id',{ascending:true});
+ if(error){$p('pLedgerMsg').textContent='تعذر تحميل كشف الحساب: '+error.message;return}
+ let bal=0,totalDebit=0,totalCredit=0;
+ const rows=(data||[]).map(x=>{const debit=Number(x.debit||0),credit=Number(x.credit||0);totalDebit+=debit;totalCredit+=credit;bal+=debit-credit;return `<tr><td>${safeP(x.entry_date)}</td><td>${safeP(x.description||x.entry_type)}</td><td>${safeP(x.currency||cur)}</td><td>${debit.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td>${credit.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td>${bal.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>`});
+ $p('pLedgerRows').innerHTML=rows.join('')||'<tr><td colspan="6">لا توجد حركات بهذه العملة.</td></tr>';
+ const unit=cur==='USD'?'دولار أمريكي':'جنيه مصري';
+ $p('pLedgerSummary').textContent='إجمالي المشتريات/المدين: '+totalDebit.toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+unit+' | إجمالي المسدد/الدائن: '+totalCredit.toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+unit+' | الرصيد المستحق: '+bal.toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+unit;
+};
+window.purchasePrintLedger=async function(){
+ const id=Number($p('pLedgerSupplier').value),cur=$p('pPaymentCurrency')?.value||'EGP';
+ if(!id){alert('اختر المورد أولاً.');return}
+ const supplier=pSuppliers.find(x=>Number(x.id)===id);
+ const ledgerQuery=sb.from('supplier_ledger').select('id,entry_date,entry_type,debit,credit,description,currency').eq('supplier_id',id);
+ const filteredLedgerQuery=cur==='EGP'?ledgerQuery.or('currency.eq.EGP,currency.is.null'):ledgerQuery.eq('currency','USD');
+ const {data,error}=await filteredLedgerQuery.order('entry_date',{ascending:true}).order('id',{ascending:true});
+ if(error){alert('تعذر تحميل كشف الحساب للطباعة: '+error.message);return}
+ let balance=0,totalDebit=0,totalCredit=0;
+ const rows=(data||[]).map(x=>{const debit=Number(x.debit||0),credit=Number(x.credit||0);totalDebit+=debit;totalCredit+=credit;balance+=debit-credit;return `<tr><td>${safeP(x.entry_date)}</td><td>${safeP(x.description||x.entry_type)}</td><td>${debit.toFixed(2)}</td><td>${credit.toFixed(2)}</td><td>${balance.toFixed(2)}</td></tr>`}).join('');
+ const unit=cur==='USD'?'USD':'EGP',w=window.open('','_blank','width=900,height=700');
+ if(!w){alert('اسمح بفتح النوافذ المنبثقة للطباعة.');return}
+ w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>كشف حساب المورد</title><style>body{font-family:Arial,Tahoma;padding:24px;color:#222}h2{color:#a90d58}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{border:1px solid #888;padding:9px;text-align:right}th{background:#fceaf2}.summary{margin-top:18px;font-weight:bold;line-height:2}@media print{button{display:none}}</style></head><body><h2>صن شاين للاستيراد والتصدير</h2><h3>كشف حساب المورد: ${safeP(supplier?.name||'')}</h3><p>العملة: ${unit}</p><table><thead><tr><th>التاريخ</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead><tbody>${rows||'<tr><td colspan="5">لا توجد حركات.</td></tr>'}</tbody></table><div class="summary">إجمالي المدين: ${totalDebit.toFixed(2)} ${unit}<br>إجمالي الدائن: ${totalCredit.toFixed(2)} ${unit}<br>الرصيد المستحق: ${(totalDebit-totalCredit).toFixed(2)} ${unit}</div><button onclick="window.print()">طباعة / حفظ PDF</button></body></html>`);w.document.close();
+};
+window.purchasePaySupplier=async function(){
+ if(role!=='admin'){alert('تسجيل دفعات الموردين متاح للمدير فقط');return}
+ const id=Number($p('pLedgerSupplier').value),amount=Number($p('pPaymentAmount').value),cur=$p('pPaymentCurrency').value;
+ if(!id||!Number.isFinite(amount)||amount<=0){$p('pLedgerMsg').textContent='اختر المورد وأدخل مبلغًا صحيحًا أكبر من صفر.';return}
+ if(!['EGP','USD'].includes(cur)){$p('pLedgerMsg').textContent='اختر الجنيه المصري أو الدولار فقط.';return}
+ const {error}=await sb.rpc('admin_record_supplier_payment',{p_supplier_id:id,p_amount:amount,p_date:new Date().toISOString().slice(0,10),p_description:$p('pPaymentDesc').value||'سند صرف للمورد',p_currency:cur});
+ $p('pLedgerMsg').textContent=error?'تعذر تسجيل الدفعة: '+error.message:'تم تسجيل الدفعة بنجاح بنفس العملة دون تحويل.';
+ if(!error){$p('pPaymentAmount').value='';await purchaseLoadLedger()}
+};
+window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'||!sb){alert('اتصال قاعدة البيانات غير متاح');return}document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');['dashboard','items','shipments','sales','customers'].forEach(x=>$p(x)?.classList.add('hidden'));$p('pageTitle').textContent='المشتريات';$p('placeholder').classList.remove('hidden');$p('placeholder').classList.add('finance-page');$p('placeholder').innerHTML=purchaseHtml();purchaseLoad();return}return oldOpen.call(this,id,btn)};
 })();
 </script>
 
@@ -1031,100 +972,5 @@ window.purchaseLoadLedger=async function(){const id=Number($p('pLedgerSupplier')
  };
 
 })();
-</script>
-
-<script>
-
-/* Sunshine HR - lightweight employee and daily attendance module (manager only). */
-(function(){
- const $=id=>document.getElementById(id);
- const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const today=()=>new Date().toISOString().slice(0,10);
- let staff=[];
- function ensureNav(){
-  if($('hrNavBtn')){$('hrNavBtn').classList.remove('hidden');return}
-  const b=document.createElement('button');b.id='hrNavBtn';
-  b.innerHTML='<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M18 8v6m-3-3h6"/></svg><span>شؤون الموظفين والحضور</span>';
-  b.addEventListener('click',()=>window.openPage('hr',b));$('nav')?.appendChild(b);
-  b.classList.remove('hidden');
- }
- function render(){
-  const host=$('placeholder');if(!host)return;
-  host.classList.remove('hidden');host.classList.add('finance-page');
-  $('pageTitle').textContent='شؤون الموظفين والحضور';
-  if(role!=='admin'){renderEmployeeAttendance();return;}
-  host.innerHTML=`<section class="finance-section"><h3>إضافة موظف</h3><div class="finance-form"><div><label>اسم الموظف</label><input id="hrName" placeholder="اسم الموظف"></div><div><label>اسم الدخول للموظف</label><input id="hrUsername" placeholder="نفس اسم المستخدم عند تسجيل الدخول"></div><div><label>رقم الهاتف</label><input id="hrPhone" placeholder="رقم الهاتف"></div><div><label>الوظيفة</label><input id="hrJob" placeholder="الوظيفة"></div></div><div class="finance-actions"><button type="button" onclick="sunshineHRAddEmployee()">حفظ الموظف</button></div><p id="hrMsg" class="msg"></p></section>
-  <section class="finance-section"><div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;justify-content:space-between"><div><h3>الحضور والغياب اليومي</h3><label for="hrDate">التاريخ</label><input id="hrDate" type="date" value="${today()}" onchange="sunshineHRLoadAttendance()" style="max-width:220px"></div><div class="finance-actions"><button type="button" class="secondary" onclick="sunshineHRLoadAttendance()">تحديث</button><button type="button" onclick="sunshineHRSaveAttendance()">حفظ الحضور</button></div></div><div class="finance-stats"><div class="finance-stat"><b>حاضر</b><strong id="hrPresent">0</strong></div><div class="finance-stat"><b>غائب</b><strong id="hrAbsent">0</strong></div><div class="finance-stat"><b>إجازة</b><strong id="hrLeave">0</strong></div></div><div class="scroll"><table><thead><tr><th>الموظف</th><th>الوظيفة</th><th>الحالة</th><th>ملاحظات</th></tr></thead><tbody id="hrAttendanceRows"><tr><td colspan="4">جارٍ التحميل...</td></tr></tbody></table></div><p class="muted">اختر حالة كل موظف ثم اضغط «حفظ الحضور». يمكن تعديل السجل لنفس اليوم دون إنشاء حركة مكررة.</p></section>
-  <section class="finance-section"><h3>قائمة الموظفين</h3><div class="scroll"><table><thead><tr><th>اسم الموظف</th><th>الهاتف</th><th>الوظيفة</th><th>الحالة</th></tr></thead><tbody id="hrStaffRows"></tbody></table></div></section>`;
-  $('hrDate').value=today();
- }
- async function loadStaff(){
-  const {data,error}=await sb.from('hr_employees').select('id,name,phone,job_title,is_active').order('name');
-  if(error)throw error;staff=data||[];
-  $('hrStaffRows').innerHTML=staff.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.phone||'—')}</td><td>${esc(x.job_title||'—')}</td><td>${x.is_active?'نشط':'موقوف'}</td></tr>`).join('')||'<tr><td colspan="4">أضف الموظفين أولاً.</td></tr>';
- }
- window.sunshineHRAddEmployee=async function(){
-  if(role!=='admin')return alert('هذه الصفحة متاحة للمدير فقط');
-  const name=$('hrName')?.value.trim();if(!name){$('hrMsg').textContent='اكتب اسم الموظف.';return}
-  const username=$('hrUsername').value.trim().toLowerCase();if(!username){$('hrMsg').textContent='أدخل اسم الدخول المطابق لحساب الموظف.';return}
-  const {error}=await sb.from('hr_employees').insert({name,login_username:username,phone:$('hrPhone').value.trim()||null,job_title:$('hrJob').value.trim()||null});
-  if(error){$('hrMsg').textContent='تعذر حفظ الموظف: '+error.message;$('hrMsg').className='msg error';return}
-  ['hrName','hrUsername','hrPhone','hrJob'].forEach(id=>$(id).value='');$('hrMsg').textContent='تم حفظ الموظف.';$('hrMsg').className='msg ok';await loadStaff();await window.sunshineHRLoadAttendance();
- };
- window.sunshineHRLoadAttendance=async function(){
-  if(role!=='admin')return;
-  try{
-   await loadStaff();const date=$('hrDate')?.value||today();
-   const {data,error}=await sb.from('hr_attendance').select('employee_id,status,notes').eq('work_date',date);
-   if(error)throw error;const records=new Map((data||[]).map(x=>[String(x.employee_id),x]));
-   const active=staff.filter(x=>x.is_active);
-   $('hrAttendanceRows').innerHTML=active.map(x=>{const a=records.get(String(x.id));return `<tr data-employee="${x.id}"><td>${esc(x.name)}</td><td>${esc(x.job_title||'—')}</td><td><select class="hr-status"><option value="present" ${(!a||a.status==='present')?'selected':''}>حاضر</option><option value="absent" ${a?.status==='absent'?'selected':''}>غائب</option><option value="leave" ${a?.status==='leave'?'selected':''}>إجازة</option></select></td><td><input class="hr-notes" value="${esc(a?.notes||'')}" placeholder="ملاحظات"></td></tr>`}).join('')||'<tr><td colspan="4">لا يوجد موظفون نشطون.</td></tr>';
-   updateCounts();document.querySelectorAll('#hrAttendanceRows .hr-status').forEach(el=>el.addEventListener('change',updateCounts));
-  }catch(e){$('hrAttendanceRows').innerHTML=`<tr><td colspan="4">تعذر تحميل الحضور: ${esc(e.message||e)}</td></tr>`}
- };
- function updateCounts(){const rows=[...document.querySelectorAll('#hrAttendanceRows tr[data-employee]')];const n=s=>rows.filter(r=>r.querySelector('.hr-status')?.value===s).length;$('hrPresent').textContent=n('present');$('hrAbsent').textContent=n('absent');$('hrLeave').textContent=n('leave')}
- window.sunshineHRSaveAttendance=async function(){
-  if(role!=='admin')return alert('هذه الصفحة متاحة للمدير فقط');
-  const date=$('hrDate').value||today();const rows=[...document.querySelectorAll('#hrAttendanceRows tr[data-employee]')];if(!rows.length){$('hrMsg').textContent='لا يوجد موظفون لتسجيل الحضور.';return}
-  const payload=rows.map(r=>({employee_id:Number(r.dataset.employee),work_date:date,status:r.querySelector('.hr-status').value,notes:r.querySelector('.hr-notes').value.trim()||null,updated_at:new Date().toISOString()}));
-  const {error}=await sb.from('hr_attendance').upsert(payload,{onConflict:'employee_id,work_date'});
-  $('hrMsg').textContent=error?'تعذر حفظ الحضور: '+error.message:'تم حفظ الحضور والغياب بتاريخ '+date;$('hrMsg').className='msg '+(error?'error':'ok');updateCounts();
- };
- function renderEmployeeAttendance(){
-  const host=$('placeholder');host.classList.remove('hidden');host.classList.add('finance-page');$('pageTitle').textContent='إثبات الحضور والانصراف';
-  host.innerHTML=`<section class="finance-section"><h3>تسجيل الحضور والانصراف</h3><p class="muted">يمكنك تسجيل حضورك عند بداية العمل، ثم تسجيل الانصراف عند نهاية العمل فقط.</p><div class="finance-stats"><div class="finance-stat"><b>تاريخ اليوم</b><strong id="empTodayDate">—</strong></div><div class="finance-stat"><b>وقت الحضور</b><strong id="empCheckIn">لم يسجل</strong></div><div class="finance-stat"><b>وقت الانصراف</b><strong id="empCheckOut">لم يسجل</strong></div></div><div class="finance-actions"><button id="empCheckInBtn" onclick="sunshineHREmployeePunch('in')">إثبات الحضور</button><button id="empCheckOutBtn" class="secondary" onclick="sunshineHREmployeePunch('out')">إثبات الانصراف</button></div><p id="empAttendanceMsg" class="msg"></p></section>`;
-  window.sunshineHRRefreshEmployee();
- }
- window.sunshineHRRefreshEmployee=async function(){
-  $('empTodayDate').textContent=new Date().toLocaleDateString('ar-EG');
-  const {data,error}=await sb.rpc('hr_employee_today_status');
-  if(error){$('empAttendanceMsg').textContent='تعذر تحميل سجل حضورك: '+error.message;$('empAttendanceMsg').className='msg error';return;}
-  const row=Array.isArray(data)?data[0]:data;
-  if(!row){$('empAttendanceMsg').textContent='لا يوجد ملف موظف مرتبط بحساب الدخول. تواصل مع المدير.';$('empAttendanceMsg').className='msg error';$('empCheckInBtn').disabled=true;$('empCheckOutBtn').disabled=true;return;}
-  $('empCheckIn').textContent=row.check_in_at?new Date(row.check_in_at).toLocaleTimeString('ar-EG'):'لم يسجل';
-  $('empCheckOut').textContent=row.check_out_at?new Date(row.check_out_at).toLocaleTimeString('ar-EG'):'لم يسجل';
-  $('empCheckInBtn').disabled=!!row.check_in_at;$('empCheckOutBtn').disabled=!row.check_in_at||!!row.check_out_at;
-  $('empAttendanceMsg').textContent='مرحبًا '+row.employee_name+' — '+(row.check_out_at?'تم تسجيل الحضور والانصراف اليوم.':row.check_in_at?'تم تسجيل حضورك، سجّل الانصراف عند المغادرة.':'لم يتم تسجيل حضورك اليوم.');$('empAttendanceMsg').className='msg ok';
- };
- window.sunshineHREmployeePunch=async function(kind){
-  const fn=kind==='in'?'hr_employee_check_in':'hr_employee_check_out';
-  const {error}=await sb.rpc(fn);
-  if(error){$('empAttendanceMsg').textContent='لم يتم التسجيل: '+error.message;$('empAttendanceMsg').className='msg error';return;}
-  $('empAttendanceMsg').textContent=kind==='in'?'تم إثبات حضورك بنجاح.':'تم إثبات انصرافك بنجاح.';$('empAttendanceMsg').className='msg ok';await window.sunshineHRRefreshEmployee();
- };
- const previousOpen=window.openPage;
- window.openPage=function(id,btn){
-  if(id==='hr'){
-   document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');
-   ['dashboard','items','shipments','sales','customers','placeholder'].forEach(x=>$(x)?.classList.add('hidden'));
-   render();if(role==='admin')window.sunshineHRLoadAttendance();return;
-  }
-  return previousOpen.call(this,id,btn);
- };
- const oldEnter=window.enterApp;
- if(typeof oldEnter==='function')window.enterApp=async function(){const r=await oldEnter.apply(this,arguments);ensureNav();return r};
- document.addEventListener('DOMContentLoaded',ensureNav);
-})();
-
 </script>
 </body></html>

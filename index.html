@@ -423,7 +423,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
   };
   function financePageHtml(){
     const bal=calcBalances();
-    const bankRows=financeBanks.map(b=>`<tr><td>${safe(b.bank_name)}</td><td>${safe(b.account_name||'')}</td><td>${safe(b.account_number||'')}</td><td>${money(b.opening_balance)}</td><td>${money(bal.bank.get(String(b.id))||0)}</td><td>${b.is_active?'نشط':'موقوف'}</td></tr>`).join('')||'<tr><td colspan="6">لا توجد حسابات بنكية حتى الآن.</td></tr>';
+    const bankRows=financeBanks.map(b=>`<tr><td>${safe(b.bank_name)}</td><td>${safe(b.account_name||'')}</td><td>${safe(b.account_number||'')}</td><td>${money(b.opening_balance)}</td><td>${money(bal.bank.get(String(b.id))||0)}</td><td>${b.is_active?'نشط':'موقوف'}</td><td>${role==='admin'?`<button type="button" onclick="editFinanceBank('${safe(b.id)}')">تعديل</button> <button type="button" class="secondary" onclick="clearFinanceBankNumber('${safe(b.id)}')">مسح رقم الحساب</button> <button type="button" class="secondary" onclick="openBankStatementFor('${safe(b.id)}')">كشف الحساب</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="7">لا توجد حسابات بنكية حتى الآن.</td></tr>';
     const custOpts=financeCustomers.map(c=>`<option value="${safe(c.id)}">${safe(c.name)}</option>`).join('');
     const bankOpts=financeBanks.filter(b=>b.is_active).map(b=>`<option value="${safe(b.id)}">${safe(b.bank_name)} — ${safe(b.account_name||'')}</option>`).join('');
     const txRows=financeTx.map(t=>{const kind=t.kind==='receipt'?'قبض':t.kind==='payment'?'صرف':'تحويل';const source=accountLabel(t.account_type,t.account_id);const target=t.kind==='transfer'?' ← '+accountLabel(t.target_account_type,t.target_account_id):'';const customer=financeCustomers.find(c=>String(c.id)===String(t.customer_id))?.name||'';return `<tr><td>${safe(t.transaction_date)}</td><td>${kind}</td><td>${safe(source+target)}</td><td>${money(t.amount)}</td><td>${safe(customer)}</td><td>${safe(t.description||'')}</td></tr>`}).join('')||'<tr><td colspan="6">لا توجد حركات مالية مسجلة.</td></tr>';
@@ -440,7 +440,10 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
         <div id="finCustomerBox"><label>العميل (اختياري)</label><select id="finCustomer"><option value="">بدون عميل</option>${custOpts}</select></div>
         <div><label>البيان</label><input id="finDescription" maxlength="500" placeholder="سبب الحركة أو ملاحظات"></div>
       </div><div class="finance-actions"><button type="button" onclick="saveFinanceTransaction()">حفظ الحركة</button><button type="button" class="secondary" onclick="refreshFinancePage()">تحديث الأرصدة</button></div><p id="finMsg" class="msg"></p><div class="finance-note">تنبيه: التحويل يسجل حركة واحدة لها حساب مصدر وحساب مستهدف، ويؤثر على رصيدي الحسابين دون اعتباره إيراداً أو مصروفاً.</div></div>
-      <div class="finance-section"><h3>حسابات البنوك</h3>${role==='admin'?`<div class="finance-form"><div><label>اسم البنك</label><input id="newBankName"></div><div><label>اسم صاحب الحساب</label><input id="newBankOwner"></div><div><label>رقم الحساب</label><input id="newBankNumber"></div><div><label>الرصيد الافتتاحي بالجنيه</label><input id="newBankOpening" type="number" min="0" step="0.01" value="0"></div></div><div class="finance-actions"><button type="button" onclick="addFinanceBank()">إضافة حساب بنكي</button></div><p id="bankMsg" class="msg"></p>`:'<p class="muted">إضافة الحسابات البنكية متاحة للمدير فقط.</p>'}<div class="finance-table"><table><thead><tr><th>البنك</th><th>صاحب الحساب</th><th>رقم الحساب</th><th>الرصيد الافتتاحي</th><th>الرصيد الحالي</th><th>الحالة</th></tr></thead><tbody>${bankRows}</tbody></table></div></div>
+      <div class="finance-section"><h3>حسابات البنوك</h3>${role==='admin'?`<div class="finance-form"><div><label>اسم البنك</label><input id="newBankName"></div><div><label>اسم صاحب الحساب</label><input id="newBankOwner"></div><div><label>رقم الحساب</label><input id="newBankNumber"></div><div><label>الرصيد الافتتاحي بالجنيه</label><input id="newBankOpening" type="number" min="0" step="0.01" value="0"></div></div><div class="finance-actions"><button type="button" onclick="addFinanceBank()">إضافة حساب بنكي</button></div><p id="bankMsg" class="msg"></p>`:'<p class="muted">إضافة الحسابات البنكية متاحة للمدير فقط.</p>'}<div class="finance-table"><table><thead><tr><th>البنك</th><th>صاحب الحساب</th><th>رقم الحساب</th><th>الرصيد الافتتاحي</th><th>الرصيد الحالي</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody>${bankRows}</tbody></table></div></div>
+      <div class="finance-section"><h3>كشف حساب بنك</h3><p class="muted">كشف مستقل لكل حساب بنكي، بالجنيه المصري، مع رصيد افتتاحي ورصيد متحرك وإمكانية الطباعة أو الحفظ PDF.</p>
+        <div class="finance-form"><div><label>اختر الحساب البنكي</label><select id="bankStatementAccount"><option value="">-- اختر البنك --</option>${financeBanks.map(b=>`<option value="${safe(b.id)}">${safe(b.bank_name)} — ${safe(b.account_name||'')}</option>`).join('')}</select></div><div><label>من تاريخ</label><input id="bankStatementFrom" type="date"></div><div><label>إلى تاريخ</label><input id="bankStatementTo" type="date"></div></div>
+        <div class="finance-actions"><button type="button" onclick="loadBankStatement()">عرض كشف الحساب</button><button type="button" class="secondary" onclick="printBankStatement()">طباعة / حفظ PDF</button></div><p id="bankStatementMsg" class="msg"></p><div id="bankStatementResult"></div></div>
       <div class="finance-section"><h3>سجل الحركات المالية</h3><div class="finance-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الحساب</th><th>المبلغ</th><th>العميل</th><th>البيان</th></tr></thead><tbody>${txRows}</tbody></table></div></div>
       <div class="finance-section"><h3>كشف حساب عميل</h3><p class="muted">الكشف يعتمد على الحركات المحفوظة في جدول customer_transactions، مع رصيد متحرك ورصيد سابق للفترة.</p>
         <div class="finance-form"><div><label>اختر العميل</label><select id="statementCustomer"><option value="">-- اختر العميل --</option>${custOpts}</select></div>
@@ -611,7 +614,48 @@ $('invDate').value=new Date().toISOString().slice(0,10);if(localStorage.getItem(
   };
   window.financeToggleFields=function(){const kind=el('finKind')?.value,src=el('finSourceType')?.value,target=el('finTargetType')?.value;if(!kind)return;el('finSourceBankBox').classList.toggle('hidden',src!=='bank');el('finTargetTypeBox').classList.toggle('hidden',kind!=='transfer');el('finTargetBankBox').classList.toggle('hidden',kind!=='transfer'||target!=='bank');el('finCustomerBox').classList.toggle('hidden',kind==='transfer')};
   window.refreshFinancePage=async function(){try{await loadFinance();setPage('الحسابات والخزينة',financePageHtml());financeToggleFields();renderCheckAlertBadge()}catch(e){alert('تعذر تحديث الحسابات والخزينة: '+e.message)}};
+  window.editFinanceBank=async function(id){
+    if(role!=='admin'){alert('تعديل حسابات البنوك متاح للمدير فقط');return}
+    const bank=financeBanks.find(b=>String(b.id)===String(id));
+    if(!bank){alert('الحساب البنكي غير موجود');return}
+    const bank_name=prompt('اسم البنك:',bank.bank_name||'');if(bank_name===null)return;
+    const account_name=prompt('اسم صاحب الحساب:',bank.account_name||'');if(account_name===null)return;
+    const account_number=prompt('رقم الحساب البنكي:',bank.account_number||'');if(account_number===null)return;
+    const openingText=prompt('الرصيد الافتتاحي بالجنيه المصري:',String(bank.opening_balance??0));if(openingText===null)return;
+    const opening_balance=Number(openingText);
+    if(!bank_name.trim()||!Number.isFinite(opening_balance)||opening_balance<0){alert('تأكد من اسم البنك وصحة الرصيد الافتتاحي.');return}
+    if(!confirm('حفظ تعديلات هذا الحساب البنكي؟'))return;
+    const {error}=await sb.from('bank_accounts').update({bank_name:bank_name.trim(),account_name:account_name.trim()||null,account_number:account_number.trim()||null,opening_balance}).eq('id',id);
+    if(error){alert('تعذر تعديل الحساب البنكي: '+error.message);return}
+    await sb.from('accounts').update({account_name:bank_name.trim()+' - '+(account_name.trim()||'بدون اسم')}).eq('id',id);
+    await refreshFinancePage();
+  };
+  window.clearFinanceBankNumber=async function(id){if(role!=='admin'){alert('مسح رقم الحساب متاح للمدير فقط');return}const bank=financeBanks.find(b=>String(b.id)===String(id));if(!bank){alert('الحساب البنكي غير موجود');return}if(!bank.account_number){alert('لا يوجد رقم حساب لمسحه');return}if(!confirm('هل تريد مسح رقم الحساب البنكي فقط؟ لن يتم حذف البنك أو أي حركات مالية.'))return;const {error}=await sb.from('bank_accounts').update({account_number:null}).eq('id',id);if(error){alert('تعذر مسح رقم الحساب: '+error.message);return}await refreshFinancePage();};
   window.addFinanceBank=async function(){if(role!=='admin'){alert('إضافة البنوك متاحة للمدير فقط');return}const bank_name=el('newBankName').value.trim(),account_name=el('newBankOwner').value.trim()||null,account_number=el('newBankNumber').value.trim()||null,opening_balance=Number(el('newBankOpening').value||0);if(!bank_name||!Number.isFinite(opening_balance)||opening_balance<0){financeMsg('bankMsg','اكتب اسم البنك وتأكد من صحة الرصيد.',false);return}const {error}=await sb.from('bank_accounts').insert({bank_name,account_name,account_number,opening_balance,is_active:true});if(error){financeMsg('bankMsg','تعذر إضافة البنك: '+error.message,false);return}await refreshFinancePage();};
+  window.openBankStatementFor=function(id){
+    const select=el('bankStatementAccount');
+    if(!select){alert('قسم كشف حساب البنك غير متاح. افتح الحسابات والخزينة أولاً.');return}
+    select.value=String(id);
+    const result=el('bankStatementResult');if(result)result.innerHTML='';
+    window.loadBankStatement();
+    const section=select.closest('.finance-section');if(section)section.scrollIntoView({behavior:'smooth',block:'start'});
+  };
+  window.loadBankStatement=function(){
+    const id=el('bankStatementAccount')?.value,from=el('bankStatementFrom')?.value||'',to=el('bankStatementTo')?.value||'',host=el('bankStatementResult');
+    if(!id){financeMsg('bankStatementMsg','اختر حساباً بنكياً أولاً.',false);host.innerHTML='';return}
+    if(from&&to&&from>to){financeMsg('bankStatementMsg','تاريخ البداية يجب أن يسبق تاريخ النهاية.',false);return}
+    const bank=financeBanks.find(b=>String(b.id)===String(id));if(!bank){financeMsg('bankStatementMsg','الحساب البنكي غير موجود.',false);return}
+    const related=financeTx.filter(t=>(t.account_type==='bank'&&String(t.account_id)===String(id))||(t.kind==='transfer'&&t.target_account_type==='bank'&&String(t.target_account_id)===String(id))).sort((a,b)=>String(a.transaction_date).localeCompare(String(b.transaction_date))||String(a.created_at||'').localeCompare(String(b.created_at||'')));
+    let balance=Number(bank.opening_balance||0),opening=balance,rows=[];
+    for(const t of related){let signed=0;if(t.kind==='transfer'){if(t.account_type==='bank'&&String(t.account_id)===String(id))signed-=Number(t.amount||0);if(t.target_account_type==='bank'&&String(t.target_account_id)===String(id))signed+=Number(t.amount||0)}else signed+=(t.kind==='receipt'?1:-1)*Number(t.amount||0);
+      if(from&&t.transaction_date<from){opening+=signed;balance+=signed;continue}if(to&&t.transaction_date>to)continue;balance+=signed;
+      const type=t.kind==='transfer'?(signed>=0?'تحويل وارد':'تحويل صادر'):(t.kind==='receipt'?'إيداع / قبض':'سحب / صرف');
+      rows.push(`<tr><td>${safe(t.transaction_date)}</td><td>${type}</td><td>${safe(t.description||'—')}</td><td>${signed>0?money(signed):'—'}</td><td>${signed<0?money(-signed):'—'}</td><td>${money(balance)}</td></tr>`);
+    }
+    host.innerHTML=`<div id="bankStatementPrintArea"><h4>كشف حساب: ${safe(bank.bank_name)} — ${safe(bank.account_name||'')}</h4><p>رقم الحساب: ${safe(bank.account_number||'—')} | الفترة: ${safe(from||'من البداية')} إلى ${safe(to||'حتى الآن')}</p><div class="finance-stats"><div class="finance-stat"><b>الرصيد السابق</b><strong>${money(opening)}</strong></div><div class="finance-stat"><b>الرصيد الختامي</b><strong>${money(balance)}</strong></div></div><div class="finance-table"><table><thead><tr><th>التاريخ</th><th>نوع الحركة</th><th>البيان</th><th>إيداع</th><th>سحب</th><th>الرصيد</th></tr></thead><tbody>${rows.join('')||'<tr><td colspan="6">لا توجد حركات خلال الفترة.</td></tr>'}</tbody></table></div></div>`;
+    financeMsg('bankStatementMsg','تم إعداد كشف الحساب.',true);
+  };
+  window.printBankStatement=function(){const area=el('bankStatementPrintArea');if(!area){financeMsg('bankStatementMsg','اعرض كشف الحساب أولاً.',false);return}const w=window.open('','_blank');if(!w){alert('اسمح بفتح النوافذ المنبثقة للطباعة.');return}w.document.write(`<html dir="rtl"><head><meta charset="utf-8"><title>كشف حساب بنك</title><style>body{font-family:Arial;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #999;padding:8px;text-align:right}h4{margin-bottom:8px}</style></head><body>${area.innerHTML}</body></html>`);w.document.close();w.focus();w.print();};
   window.saveFinanceTransaction=async function(){
     const kind=el('finKind').value,account_type=el('finSourceType').value,amount=Number(el('finAmount').value),transaction_date=el('finDate').value||today(),description=el('finDescription').value.trim()||null;
     if(!Number.isFinite(amount)||amount<=0){financeMsg('finMsg','أدخل مبلغاً صحيحاً أكبر من صفر.',false);return}

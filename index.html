@@ -188,10 +188,9 @@ async function sendInvoiceImageToPhone(){
  try{
   const {blob,filename}=await createCurrentInvoiceImage();
   downloadInvoiceImage(blob,filename);
-  const message='فاتورة مبيعات من صن شاين للاستيراد والتصدير — العميل: '+(customer.name||'')+' — رقم الفاتورة: '+($('invNo').value||'');
-  const url='https://wa.me/'+phone+'?text='+encodeURIComponent(message+'\nصورة الفاتورة جاهزة على جهازك للإرفاق.');
+  const url='https://wa.me/'+phone;
   if(popup)popup.location.href=url;else window.location.href=url;
-  alert('تم فتح محادثة العميل المسجل وتجهيز صورة الفاتورة وتنزيلها. أرفق الصورة في واتساب ثم اضغط إرسال.');
+  alert('تم فتح محادثة العميل مباشرةً وتنزيل صورة الفاتورة. من داخل المحادثة اضغط (+) ثم الصور، واختر صورة الفاتورة واضغط إرسال.');
  }catch(e){if(popup)popup.close();alert('تعذر تجهيز صورة الفاتورة: '+(e.message||e))}
 }
 async function sendInvoiceImageToCompanyGroup(){
@@ -432,10 +431,9 @@ window.sendArchivedSaleImageToPhone=async function(id){
   const phone=normalizeWhatsAppPhone(customer?.phone||'');
   if(!phone){if(popup)popup.close();alert('لا يوجد رقم هاتف مسجل لهذا العميل. أضف الرقم في بيانات العميل أولًا.');return}
   downloadInvoiceImage(imageBlob,imageFilename);
-  const message='فاتورة مبيعات من صن شاين للاستيراد والتصدير — العميل: '+(customer.name||'')+' — رقم الفاتورة: '+sale.invoice_number;
-  const url='https://wa.me/'+phone+'?text='+encodeURIComponent(message+'\nصورة الفاتورة جاهزة على جهازك للإرفاق.');
+  const url='https://wa.me/'+phone;
   if(popup)popup.location.href=url;else window.location.href=url;
-  alert('تم فتح محادثة العميل المسجل وتجهيز صورة الفاتورة وتنزيلها. أرفق الصورة في واتساب ثم اضغط إرسال.');
+  alert('تم فتح محادثة العميل مباشرةً وتنزيل صورة الفاتورة. من داخل المحادثة اضغط (+) ثم الصور، واختر صورة الفاتورة واضغط إرسال.');
  }catch(e){if(popup)popup.close();alert('تعذر تجهيز صورة الفاتورة: '+(e.message||e))}
 };
 window.sendArchivedSaleImageToCompanyGroup=async function(id){

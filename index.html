@@ -32,7 +32,7 @@
 <div><label>العملة</label><select id="invCurrency"><option value="EGP">جنيه مصري</option></select></div>
 </div>
 <div class="scroll"><table id="invoiceTable"><thead><tr><th>الصنف / البيان</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th><th class="no-print">حذف</th></tr></thead><tbody id="invoiceRows"></tbody></table></div>
-<div class="invoice-actions no-print"><button type="button" onclick="addInvoiceRow()">إضافة صنف</button><button id="saveInvoiceBtn" type="button" onclick="saveInvoice()">حفظ الفاتورة</button><button id="cancelSaleEditBtn" type="button" class="secondary hidden" onclick="cancelSaleEdit()">إلغاء تعديل الفاتورة</button><button type="button" style="background:#168b55" onclick="sendInvoicePdfToPhone()">إرسال PDF الفاتورة للعميل</button><button type="button" style="background:#075e54" onclick="sendInvoicePdfToCompanyGroup()">إرسال PDF الفاتورة للجروب</button><button type="button" class="secondary" onclick="loadSalesArchive()">أرشيف الفواتير</button><button type="button" onclick="window.print()">طباعة الفاتورة</button></div><p id="salesmsg" class="msg no-print"></p><div id="salesArchive" class="no-print hidden"><h3>أرشيف الفواتير</h3><div class="scroll"><table><thead><tr><th>رقم الفاتورة</th><th>اسم العميل</th><th>التاريخ</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>العملة</th><th>الإجراءات</th></tr></thead><tbody id="archiveRows"></tbody></table></div></div>
+<div class="invoice-actions no-print"><button type="button" onclick="addInvoiceRow()">إضافة صنف</button><button id="saveInvoiceBtn" type="button" onclick="saveInvoice()">حفظ الفاتورة</button><button id="cancelSaleEditBtn" type="button" class="secondary hidden" onclick="cancelSaleEdit()">إلغاء تعديل الفاتورة</button><button type="button" style="background:#168b55" onclick="sendInvoiceImageToPhone()">إرسال صورة الفاتورة للعميل</button><button type="button" style="background:#075e54" onclick="sendInvoicePdfToCompanyGroup()">إرسال PDF الفاتورة للجروب</button><button type="button" class="secondary" onclick="loadSalesArchive()">أرشيف الفواتير</button><button type="button" onclick="window.print()">طباعة الفاتورة</button></div><p id="salesmsg" class="msg no-print"></p><div id="salesArchive" class="no-print hidden"><h3>أرشيف الفواتير</h3><div class="scroll"><table><thead><tr><th>رقم الفاتورة</th><th>اسم العميل</th><th>التاريخ</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>العملة</th><th>الإجراءات</th></tr></thead><tbody id="archiveRows"></tbody></table></div></div>
 <div class="invoice-total"><div><b>الإجمالي</b><strong id="invGrand">0.00</strong></div><div><b>المدفوع</b><input id="invPaid" type="number" min="0" value="0" oninput="calcInvoice()" style="max-width:140px"></div><div><b>المتبقي</b><strong id="invDue">0.00</strong></div></div><div class="invoice-notes"><label for="invNotes">ملاحظات</label><textarea id="invNotes" rows="3" placeholder="اكتب أي ملاحظات خاصة بالفاتورة هنا..."></textarea></div><div style="margin-top:28px;border-top:1px solid #aaa;padding-top:10px;text-align:center;font-weight:800">شكرًا لتعاملكم معنا</div>
 </div><p class="muted no-print">راجع الأصناف والكميات والأسعار قبل الحفظ. الحفظ يخصم المخزون من قاعدة البيانات من خلال عملية واحدة.</p></div>
 <div id="placeholder" class="card hidden"><h3 id="placeholderTitle"></h3><p class="muted">هذه الوحدة في مرحلة التوصيل بقاعدة البيانات.</p></div></main></div></section></div>
@@ -157,12 +157,40 @@ async function createCurrentInvoiceImage(){
  try{const canvas=await html2canvas(clone,{scale:2,useCORS:true,backgroundColor:'#fff',logging:false,windowWidth:clone.scrollWidth});const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('فشل إنشاء صورة الفاتورة')),'image/png'));const no=($('invNo')?.value||'invoice').replace(/[^a-zA-Z0-9_-]/g,'_');return {blob,filename:'Sunshine_'+no+'.png'};}finally{holder.remove()}
 }
 function downloadInvoiceImage(blob,filename){const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000)}
+let sunshinePreparedImageShare=null;
+function showPreparedInvoiceImageShare(file, phone, customerName, message){
+ const old=document.getElementById('sunshineImageSharePanel');if(old)old.remove();
+ const panel=document.createElement('div');panel.id='sunshineImageSharePanel';
+ panel.style.cssText='position:fixed;z-index:999999;inset:auto 16px 16px 16px;background:#fff;border:2px solid #168b55;border-radius:14px;padding:16px;box-shadow:0 8px 32px #0004;direction:rtl;font-family:Arial,Tahoma,sans-serif;color:#222;max-width:520px;margin:auto';
+ const supported=!!(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]}));
+ panel.innerHTML='<div style="font-weight:700;margin-bottom:8px">تم تجهيز صورة الفاتورة</div><div style="font-size:14px;margin-bottom:12px">العميل: '+String(customerName||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))+' — '+String(phone)+'</div><button type="button" id="sunshineShareNow" style="background:#168b55;color:#fff;border:0;border-radius:8px;padding:12px 18px;font-weight:700;width:100%;cursor:pointer">'+(supported?'مشاركة الصورة الآن':'فتح واتساب وإرفاق الصورة')+'</button><button type="button" id="sunshineShareCancel" style="margin-top:8px;background:#eee;color:#333;border:0;border-radius:8px;padding:9px;width:100%;cursor:pointer">إغلاق</button><div style="font-size:12px;color:#666;margin-top:8px">'+(supported?'ستظهر قائمة المشاركة؛ اختر واتساب ثم محادثة العميل وأكد الإرسال.':'هذا المتصفح لا يدعم مشاركة الصور مباشرة؛ سيتم فتح المحادثة وتنزيل الصورة لإرفاقها يدويًا.')+'</div>';
+ document.body.appendChild(panel);
+ panel.querySelector('#sunshineShareCancel').onclick=()=>panel.remove();
+ panel.querySelector('#sunshineShareNow').onclick=async()=>{
+  if(supported){
+   try{await navigator.share({files:[file],title:'فاتورة '+file.name,text:message});panel.remove();}
+   catch(e){if(e?.name!=='AbortError')alert('تعذرت مشاركة الصورة: '+(e.message||e));}
+  }else{
+   downloadInvoiceImage(file, file.name);
+   const w=window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(message),'_blank');
+   if(!w)window.location.href='https://wa.me/'+phone+'?text='+encodeURIComponent(message);
+   panel.remove();
+  }
+ };
+}
 async function sendInvoiceImageToPhone(){
- const selected=$('customerSelect')?.value;if(selected===undefined||selected===null||selected===''){alert('اختر العميل من قائمة العملاء أولًا.');return}
- const customer=customersCache[Number(selected)];if(!customer){alert('تعذر العثور على بيانات العميل المختار.');return}
- const phone=normalizeWhatsAppPhone(customer.phone||'');if(!phone){alert('لا يوجد رقم هاتف مسجل لهذا العميل. أضف الرقم في بيانات العميل أولًا.');return}
- const popup=window.open('about:blank','_blank');
- try{const {blob,filename}=await createCurrentInvoiceImage();downloadInvoiceImage(blob,filename);const msg='فاتورة من صن شاين للاستيراد والتصدير — العميل: '+(customer.name||'')+' — رقم الفاتورة: '+($('invNo').value||'')+'\nتم تجهيز صورة الفاتورة وتنزيلها. أرفق الصورة من (+) ثم المعرض/الصور.';const url='https://wa.me/'+phone+'?text='+encodeURIComponent(msg);if(popup)popup.location.href=url;else window.location.href=url;alert('تم تجهيز صورة الفاتورة وفتح محادثة العميل المسجل. أرفق الصورة التي تم تنزيلها من (+) ثم الصور لإرسالها.');}catch(e){if(popup)popup.close();alert('تعذر تجهيز صورة الفاتورة: '+(e.message||e))}
+ const selected=$('customerSelect')?.value;
+ if(selected===undefined||selected===null||selected===''){alert('اختر العميل من قائمة العملاء أولًا.');return}
+ const customer=customersCache[Number(selected)];
+ if(!customer){alert('تعذر العثور على بيانات العميل المختار.');return}
+ const phone=normalizeWhatsAppPhone(customer.phone||'');
+ if(!phone){alert('لا يوجد رقم هاتف مسجل لهذا العميل. أضف الرقم في بيانات العميل أولًا.');return}
+ try{
+  const {blob,filename}=await createCurrentInvoiceImage();
+  const file=new File([blob],filename,{type:'image/png'});
+  const message='فاتورة مبيعات من صن شاين للاستيراد والتصدير — العميل: '+(customer.name||'')+' — رقم الفاتورة: '+($('invNo').value||'');
+  showPreparedInvoiceImageShare(file,phone,customer.name,message);
+ }catch(e){alert('تعذر تجهيز صورة الفاتورة: '+(e.message||e))}
 }
 async function sendInvoiceImageToCompanyGroup(){
  const groupUrl='https://chat.whatsapp.com/LPpf5RM4IeaHPpu4nKkQz8?s=hd&p=i&iam=2';
@@ -327,7 +355,7 @@ async function loadSalesArchive(){
   const {data,error}=await sb.from('sales').select('id,invoice_number,customer_id,invoice_date,total_amount,paid_amount,remaining_amount,currency').order('invoice_date',{ascending:false}).limit(100);
   if(error){$('archiveRows').innerHTML='<tr><td colspan="8">تعذر تحميل الأرشيف: '+esc(error.message)+'</td></tr>';return}
   const customerNames=new Map(customersCache.map(c=>[String(c.id),c.name]));
-  $('archiveRows').innerHTML=(data||[]).map(x=>{const id=String(x.id).replace(/'/g,'');const editBtn=role==='admin'?` <button type="button" onclick="editSaleInvoice('${id}')">تعديل الفاتورة</button>`:'';return `<tr><td>${esc(x.invoice_number)}</td><td>${esc(customerNames.get(String(x.customer_id))||'غير محدد')}</td><td>${esc(x.invoice_date)}</td><td>${Number(x.total_amount||0).toLocaleString()}</td><td>${Number(x.paid_amount||0).toLocaleString()}</td><td>${Number(x.remaining_amount||0).toLocaleString()}</td><td>${esc(x.currency)}</td><td><button type="button" class="secondary" onclick="showSaleDetails('${id}')">عرض</button> <button type="button" onclick="printArchivedSale('${id}')">PDF</button> <button type="button" style="background:#168b55" onclick="sendArchivedSalePdfToPhone('${id}')">إرسال PDF للعميل</button> <button type="button" style="background:#075e54" onclick="sendArchivedSalePdfToCompanyGroup('${id}')">إرسال PDF للجروب</button>${editBtn}</td></tr>`}).join('')||'<tr><td colspan="8">لا توجد فواتير محفوظة.</td></tr>';
+  $('archiveRows').innerHTML=(data||[]).map(x=>{const id=String(x.id).replace(/'/g,'');const editBtn=role==='admin'?` <button type="button" onclick="editSaleInvoice('${id}')">تعديل الفاتورة</button>`:'';return `<tr><td>${esc(x.invoice_number)}</td><td>${esc(customerNames.get(String(x.customer_id))||'غير محدد')}</td><td>${esc(x.invoice_date)}</td><td>${Number(x.total_amount||0).toLocaleString()}</td><td>${Number(x.paid_amount||0).toLocaleString()}</td><td>${Number(x.remaining_amount||0).toLocaleString()}</td><td>${esc(x.currency)}</td><td><button type="button" class="secondary" onclick="showSaleDetails('${id}')">عرض</button> <button type="button" onclick="printArchivedSale('${id}')">PDF</button> <button type="button" style="background:#168b55" onclick="sendArchivedSaleImageToPhone('${id}')">إرسال صورة للعميل</button> <button type="button" style="background:#075e54" onclick="sendArchivedSalePdfToCompanyGroup('${id}')">إرسال PDF للجروب</button>${editBtn}</td></tr>`}).join('')||'<tr><td colspan="8">لا توجد فواتير محفوظة.</td></tr>';
 }
 function invoicePrintWindow(title, subtitle, rows, totals, companyContact=''){
   const w=window.open('','_blank','width=900,height=700');
@@ -382,23 +410,28 @@ window.sendArchivedSalePdfToPhone=async function(id){
   const file=new File([blob],filename,{type:'application/pdf'});
   const message='فاتورة مبيعات من صن شاين للاستيراد والتصدير — العميل: '+(customer.name||'')+' — رقم الفاتورة: '+sale.invoice_number;
   if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
-   if(popup)popup.close();
-   await navigator.share({files:[file],title:'فاتورة '+filename,text:message});
-   return;
+   try{await navigator.share({files:[file],title:'فاتورة '+filename,text:message});if(popup)popup.close();return;}
+   catch(shareError){if(shareError?.name==='AbortError'){if(popup)popup.close();return;}/* بعض المتصفحات تفقد صلاحية المشاركة بعد تجهيز PDF؛ نستخدم البديل أدناه */}
   }
   downloadInvoicePdf(blob,filename);
   const url='https://wa.me/'+phone+'?text='+encodeURIComponent(message+'\nتم تجهيز ملف PDF. أرفقه من (+) ثم مستند.');
   if(popup)popup.location.href=url;else window.location.href=url;
-  alert('تم فتح محادثة العميل المسجل وتجهيز ملف PDF. أرفق الملف من (+) ثم مستند.');
- }catch(e){if(popup)popup.close();if(e?.name==='AbortError')return;alert('تعذر تجهيز أو مشاركة الفاتورة PDF: '+(e.message||e));}
+  alert('تم فتح محادثة العميل المسجل وتنزيل الفاتورة PDF. داخل واتساب اختر (+) ثم مستند لإرفاقها.');
+ }catch(e){if(popup)popup.close();if(e?.name==='AbortError')return;alert('تعذر تجهيز الفاتورة PDF: '+(e.message||e));}
 };
 window.sendArchivedSalePdfToCompanyGroup=async function(id){
  const groupUrl='https://chat.whatsapp.com/LPpf5RM4IeaHPpu4nKkQz8?s=hd&p=i&iam=2';
  try{const {blob,filename}=await createArchivedSalePdf(id);const file=new File([blob],filename,{type:'application/pdf'});if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'فاتورة '+filename,text:'فاتورة مبيعات من صن شاين للاستيراد والتصدير'});return;}downloadInvoicePdf(blob,filename);const w=window.open(groupUrl,'_blank');if(!w)window.location.href=groupUrl;alert('تم تنزيل PDF وفتح جروب الشركة. أرفق الملف داخل الجروب من (+) ثم مستند.');}catch(e){if(e?.name==='AbortError')return;alert('تعذر تجهيز أو مشاركة الفاتورة: '+(e.message||e));}
 };
 window.sendArchivedSaleImageToPhone=async function(id){
- const popup=window.open('about:blank','_blank');
- try{const {imageBlob,imageFilename,sale,customer}=await createArchivedSalePdf(id);const phone=normalizeWhatsAppPhone(customer?.phone||'');if(!phone){if(popup)popup.close();alert('لا يوجد رقم هاتف مسجل لهذا العميل. أضف الرقم في بيانات العميل أولًا.');return;}downloadInvoiceImage(imageBlob,imageFilename);const message='فاتورة مبيعات من صن شاين للاستيراد والتصدير — رقم الفاتورة: '+sale.invoice_number+'\nتم تجهيز صورة الفاتورة وتنزيلها. أرفق الصورة من (+) ثم الصور.';const url='https://wa.me/'+phone+'?text='+encodeURIComponent(message);if(popup)popup.location.href=url;else window.location.href=url;alert('تم تجهيز صورة الفاتورة وفتح محادثة العميل. أرفق الصورة التي تم تنزيلها من (+) ثم الصور.');}catch(e){if(popup)popup.close();alert('تعذر تجهيز صورة الفاتورة: '+(e.message||e))}
+ try{
+  const {imageBlob,imageFilename,sale,customer}=await createArchivedSalePdf(id);
+  const phone=normalizeWhatsAppPhone(customer?.phone||'');
+  if(!phone){alert('لا يوجد رقم هاتف مسجل لهذا العميل. أضف الرقم في بيانات العميل أولًا.');return}
+  const file=new File([imageBlob],imageFilename,{type:'image/png'});
+  const message='فاتورة مبيعات من صن شاين للاستيراد والتصدير — العميل: '+(customer.name||'')+' — رقم الفاتورة: '+sale.invoice_number;
+  showPreparedInvoiceImageShare(file,phone,customer.name,message);
+ }catch(e){alert('تعذر تجهيز صورة الفاتورة: '+(e.message||e))}
 };
 window.sendArchivedSaleImageToCompanyGroup=async function(id){
  const groupUrl='https://chat.whatsapp.com/LPpf5RM4IeaHPpu4nKkQz8?s=hd&p=i&iam=2';

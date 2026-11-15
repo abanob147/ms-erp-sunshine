@@ -118,27 +118,43 @@ async function createCurrentInvoicePdf(){
 }
 function downloadInvoicePdf(blob,filename){const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000)}
 async function sendInvoicePdfToPhone(){
- const entered=prompt('اكتب رقم واتساب العميل أو أي رقم آخر (مثال: 01012345678):',$('invPhone')?.value||'');
- if(entered===null)return;
- const phone=normalizeWhatsAppPhone(entered);
- if(!phone){alert('اكتب رقم هاتف صحيحًا.');return}
+ // رقم الإرسال يُؤخذ حصريًا من سجل العميل المختار، وليس من خانة الهاتف القابلة للتعديل.
+ const selected=$('customerSelect')?.value;
+ if(selected===undefined||selected===null||selected===''){
+   alert('اختر العميل من قائمة «اختيار عميل مسجل» أولًا حتى يتم استخدام رقم الهاتف المحفوظ في بياناته.');return;
+ }
+ const customer=customersCache[Number(selected)];
+ if(!customer){alert('تعذر العثور على بيانات العميل المختار. أعد تحميل قائمة العملاء ثم حاول مرة أخرى.');return}
+ const phone=normalizeWhatsAppPhone(customer.phone||'');
+ if(!phone){alert('لا يوجد رقم هاتف مسجل لهذا العميل. افتح صفحة العملاء وأضف رقم الهاتف ثم أعد المحاولة.');return}
  const popup=window.open('about:blank','_blank');
  try{
    const {blob,filename}=await createCurrentInvoicePdf();downloadInvoicePdf(blob,filename);
-   const msg='فاتورة من صن شاين للاستيراد والتصدير — رقم الفاتورة: '+($('invNo').value||'')+' — التاريخ: '+($('invDate').value||'')+'\nتم إرفاق نسخة PDF بعد تنزيلها.';
+   const msg='فاتورة من صن شاين للاستيراد والتصدير — العميل: '+(customer.name||'')+' — رقم الفاتورة: '+($('invNo').value||'')+' — التاريخ: '+($('invDate').value||'')+'\nتم تجهيز ملف PDF؛ يرجى إرفاقه من (+) ثم مستند.';
    const url='https://wa.me/'+phone+'?text='+encodeURIComponent(msg);
    if(popup)popup.location.href=url;else window.location.href=url;
-   alert('تم تجهيز وتنزيل ملف PDF. في محادثة واتساب اضغط (+) ثم مستند واختر ملف '+filename+' لإرساله.');
+   alert('تم فتح واتساب على الرقم المسجل للعميل «'+(customer.name||'')+'». أرفق ملف '+filename+' من (+) ثم مستند لإتمام الإرسال.');
  }catch(e){if(popup)popup.close();alert('تعذر تجهيز الفاتورة PDF: '+(e.message||e))}
 }
 async function sendInvoicePdfToCompanyGroup(){
- const popup=window.open('about:blank','_blank');
+ const groupUrl='https://chat.whatsapp.com/LPpf5RM4IeaHPpu4nKkQz8?s=hd&p=i&iam=2';
  try{
-   const {blob,filename}=await createCurrentInvoicePdf();downloadInvoicePdf(blob,filename);
-   const groupUrl='https://chat.whatsapp.com/LPpf5RM4IeaHPpu4nKkQz8?s=hd&p=i&iam=2';
-   if(popup)popup.location.href=groupUrl;else window.location.href=groupUrl;
-   alert('تم تجهيز وتنزيل ملف PDF. افتح جروب الشركة، ثم اضغط (+) ثم مستند واختر ملف '+filename+' لإرساله.');
- }catch(e){if(popup)popup.close();alert('تعذر تجهيز الفاتورة PDF: '+(e.message||e))}
+   const {blob,filename}=await createCurrentInvoicePdf();
+   const file=new File([blob],filename,{type:'application/pdf'});
+   // على الهواتف المتوافقة، افتح قائمة المشاركة لإرسال ملف PDF مباشرةً إلى واتساب ثم اختيار جروب الشركة.
+   if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+     await navigator.share({files:[file],title:'فاتورة صن شاين',text:'فاتورة مبيعات من صن شاين للاستيراد والتصدير'});
+     return;
+   }
+   // بديل للأجهزة/المتصفحات التي لا تدعم مشاركة الملفات.
+   downloadInvoicePdf(blob,filename);
+   const popup=window.open(groupUrl,'_blank');
+   if(!popup)window.location.href=groupUrl;
+   alert('تم تنزيل ملف PDF وفتح رابط جروب الشركة. داخل واتساب اختر الجروب ثم (+) ثم مستند وأرفق الملف: '+filename);
+ }catch(e){
+   if(e&&e.name==='AbortError')return;
+   alert('تعذر تجهيز أو مشاركة الفاتورة PDF: '+(e.message||e));
+ }
 }
 function sendInvoiceWhatsApp(){const p=normalizeWhatsAppPhone($('invPhone').value);if(!p){alert('اختر عميلًا مسجلًا أو أدخل رقم هاتف العميل أولًا.');return}const lines=[...document.querySelectorAll('#invoiceRows tr')].map((tr,i)=>{const sel=tr.querySelector('.invoice-product');const idx=sel?.value;const item=idx!==''&&idx!==undefined?itemsCache[Number(idx)]:null;const name=item?.name||tr.querySelector('.manual-product')?.value||('الصنف '+(i+1));const q=Number(tr.querySelector('.qty')?.value||0),price=Number(tr.querySelector('.price')?.value||0);return '• '+name+' — الكمية: '+q+' — السعر: '+price.toFixed(2)+' — الإجمالي: '+(q*price).toFixed(2)}).join('\n');const currency=$('invCurrency').value==='EGP'?'جنيه مصري':$('invCurrency').value==='USD'?'دولار أمريكي':'يوان صيني';const textMessage='فاتورة مبيعات - صن شاين للاستيراد والتصدير\nرقم الفاتورة: '+$('invNo').value+'\nالتاريخ: '+$('invDate').value+'\nالعميل: '+$('invCustomer').value+'\n\n'+lines+'\n\nالإجمالي: '+$('invGrand').textContent+' '+currency+'\nالمدفوع: '+$('invPaid').value+'\nالمتبقي: '+$('invDue').textContent+'\n\nالملاحظات: '+($('invNotes')?.value.trim()||'لا توجد')+'\n\nشكرًا لتعاملكم معنا.';window.open('https://wa.me/'+p+'?text='+encodeURIComponent(textMessage),'_blank','noopener')}
 function chooseCustomer(){const c=customersCache[Number($('customerSelect').value)];if(!c)return;$('invCustomer').value=c.name||'';$('invPhone').value=c.phone||'';$('invAddress').value=c.address||''}
@@ -297,7 +313,7 @@ async function loadSalesArchive(){
   const {data,error}=await sb.from('sales').select('id,invoice_number,customer_id,invoice_date,total_amount,paid_amount,remaining_amount,currency').order('invoice_date',{ascending:false}).limit(100);
   if(error){$('archiveRows').innerHTML='<tr><td colspan="8">تعذر تحميل الأرشيف: '+esc(error.message)+'</td></tr>';return}
   const customerNames=new Map(customersCache.map(c=>[String(c.id),c.name]));
-  $('archiveRows').innerHTML=(data||[]).map(x=>{const id=String(x.id).replace(/'/g,'');const editBtn=role==='admin'?` <button type="button" onclick="editSaleInvoice('${id}')">تعديل الفاتورة</button>`:'';return `<tr><td>${esc(x.invoice_number)}</td><td>${esc(customerNames.get(String(x.customer_id))||'غير محدد')}</td><td>${esc(x.invoice_date)}</td><td>${Number(x.total_amount||0).toLocaleString()}</td><td>${Number(x.paid_amount||0).toLocaleString()}</td><td>${Number(x.remaining_amount||0).toLocaleString()}</td><td>${esc(x.currency)}</td><td><button type="button" class="secondary" onclick="showSaleDetails('${id}')">عرض</button> <button type="button" onclick="printArchivedSale('${id}')">PDF</button> <button type="button" style="background:#168b55" onclick="sendArchivedSaleWhatsApp('${id}')">واتساب</button>${editBtn}</td></tr>`}).join('')||'<tr><td colspan="8">لا توجد فواتير محفوظة.</td></tr>';
+  $('archiveRows').innerHTML=(data||[]).map(x=>{const id=String(x.id).replace(/'/g,'');const editBtn=role==='admin'?` <button type="button" onclick="editSaleInvoice('${id}')">تعديل الفاتورة</button>`:'';return `<tr><td>${esc(x.invoice_number)}</td><td>${esc(customerNames.get(String(x.customer_id))||'غير محدد')}</td><td>${esc(x.invoice_date)}</td><td>${Number(x.total_amount||0).toLocaleString()}</td><td>${Number(x.paid_amount||0).toLocaleString()}</td><td>${Number(x.remaining_amount||0).toLocaleString()}</td><td>${esc(x.currency)}</td><td><button type="button" class="secondary" onclick="showSaleDetails('${id}')">عرض</button> <button type="button" onclick="printArchivedSale('${id}')">PDF</button> <button type="button" style="background:#168b55" onclick="sendArchivedSalePdfToPhone('${id}')">إرسال PDF للعميل</button> <button type="button" style="background:#075e54" onclick="sendArchivedSalePdfToCompanyGroup('${id}')">إرسال PDF للجروب</button>${editBtn}</td></tr>`}).join('')||'<tr><td colspan="8">لا توجد فواتير محفوظة.</td></tr>';
 }
 function invoicePrintWindow(title, subtitle, rows, totals, companyContact=''){
   const w=window.open('','_blank','width=900,height=700');
@@ -324,6 +340,31 @@ window.printArchivedSale=async function(id){
    ' | العنوان: '+(customer?.address||'غير مسجل')+
    ' | التاريخ: '+sale.invoice_date;
  invoicePrintWindow('فاتورة مبيعات رقم '+sale.invoice_number,customerInfo,(details||[]).map(x=>({name:names.get(String(x.item_id))||('صنف '+x.item_id),qty:x.quantity,price:Number(x.unit_price||0).toFixed(2),total:Number(x.total||0).toFixed(2)})),['الإجمالي: '+Number(sale.total_amount||0).toFixed(2)+' جنيه','المدفوع: '+Number(sale.paid_amount||0).toFixed(2)+' جنيه','المتبقي: '+Number(sale.remaining_amount||0).toFixed(2)+' جنيه'],companyContact);
+};
+async function createArchivedSalePdf(id){
+ if(typeof html2pdf==='undefined')throw new Error('تعذر تحميل أداة PDF. تأكد من اتصال الإنترنت.');
+ const {data:sale,error}=await sb.from('sales').select('id,invoice_number,customer_id,invoice_date,total_amount,paid_amount,remaining_amount,currency').eq('id',id).single();
+ if(error)throw error;
+ const {data:details,error:de}=await sb.from('sale_items').select('item_id,quantity,unit_price,total').eq('sale_id',id);
+ if(de)throw de;
+ let customer=customersCache.find(c=>String(c.id)===String(sale.customer_id))||{};
+ if(sale.customer_id!==null&&sale.customer_id!==undefined){const {data:c}=await sb.from('customers').select('name,phone,address').eq('id',sale.customer_id).maybeSingle();if(c)customer={...customer,...c};}
+ const {data:company}=await sb.from('company_settings').select('phone,address').eq('id',1).maybeSingle();
+ const names=new Map(itemsCache.map(i=>[String(i.id),i.name]));
+ const escPdf=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const currency=sale.currency==='USD'?'دولار أمريكي':'جنيه مصري';
+ const root=document.createElement('div');
+ root.dir='rtl';root.style.cssText='width:190mm;padding:8mm;background:#fff;color:#111;font-family:Arial,Tahoma,sans-serif;box-sizing:border-box';
+ root.innerHTML=`<div style="text-align:center;border-bottom:3px solid #d41470;padding:12px 0"><h2 style="color:#a90d58;margin:0 0 8px">صن شاين للاستيراد والتصدير</h2><div>${escPdf(company?.phone?'هاتف الشركة: '+company.phone:'')} ${escPdf(company?.address?' | '+company.address:'')}</div></div><h2 style="text-align:center">فاتورة مبيعات رقم ${escPdf(sale.invoice_number)}</h2><p>العميل: ${escPdf(customer.name||'غير محدد')} | الهاتف: ${escPdf(customer.phone||'غير مسجل')} | العنوان: ${escPdf(customer.address||'غير مسجل')}</p><p>التاريخ: ${escPdf(sale.invoice_date)}</p><table style="width:100%;border-collapse:collapse"><thead><tr><th style="border:1px solid #777;padding:7px">الصنف</th><th style="border:1px solid #777;padding:7px">الكمية</th><th style="border:1px solid #777;padding:7px">سعر الوحدة</th><th style="border:1px solid #777;padding:7px">الإجمالي</th></tr></thead><tbody>${(details||[]).map(d=>`<tr><td style="border:1px solid #777;padding:7px">${escPdf(names.get(String(d.item_id))||('صنف '+d.item_id))}</td><td style="border:1px solid #777;padding:7px">${escPdf(d.quantity)}</td><td style="border:1px solid #777;padding:7px">${Number(d.unit_price||0).toFixed(2)}</td><td style="border:1px solid #777;padding:7px">${Number(d.total||0).toFixed(2)}</td></tr>`).join('')}</tbody></table><div style="margin-top:18px;line-height:2;font-weight:bold">الإجمالي: ${Number(sale.total_amount||0).toFixed(2)} ${currency}<br>المدفوع: ${Number(sale.paid_amount||0).toFixed(2)} ${currency}<br>المتبقي: ${Number(sale.remaining_amount||0).toFixed(2)} ${currency}</div><p style="margin-top:28px">شكراً لتعاملكم معنا.</p>`;
+ const holder=document.createElement('div');holder.style.cssText='position:fixed;left:-10000px;top:0;width:210mm;background:#fff;z-index:-1';holder.appendChild(root);document.body.appendChild(holder);
+ try{const filename='Sunshine_'+String(sale.invoice_number||id).replace(/[^a-zA-Z0-9_-]/g,'_')+'.pdf';const blob=await html2pdf().set({margin:8,filename,image:{type:'jpeg',quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#fff'},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(root).outputPdf('blob');return {blob,filename,sale,customer};}finally{holder.remove()}
+}
+window.sendArchivedSalePdfToPhone=async function(id){
+ try{const {blob,filename,sale,customer}=await createArchivedSalePdf(id);const phone=normalizeWhatsAppPhone(customer?.phone||'');if(!phone){alert('لا يوجد رقم هاتف مسجل لهذا العميل. أضف رقم الهاتف في بيانات العميل أولاً.');return;}downloadInvoicePdf(blob,filename);const message='فاتورة مبيعات من صن شاين للاستيراد والتصدير\nرقم الفاتورة: '+sale.invoice_number+'\nتم تجهيز ملف PDF وتنزيله. يرجى إرفاقه من (+) ثم مستند.';window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(message),'_blank','noopener');}catch(e){alert('تعذر تجهيز الفاتورة PDF: '+(e.message||e));}
+};
+window.sendArchivedSalePdfToCompanyGroup=async function(id){
+ const groupUrl='https://chat.whatsapp.com/LPpf5RM4IeaHPpu4nKkQz8?s=hd&p=i&iam=2';
+ try{const {blob,filename}=await createArchivedSalePdf(id);const file=new File([blob],filename,{type:'application/pdf'});if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'فاتورة '+filename,text:'فاتورة مبيعات من صن شاين للاستيراد والتصدير'});return;}downloadInvoicePdf(blob,filename);const w=window.open(groupUrl,'_blank');if(!w)window.location.href=groupUrl;alert('تم تنزيل PDF وفتح جروب الشركة. أرفق الملف داخل الجروب من (+) ثم مستند.');}catch(e){if(e?.name==='AbortError')return;alert('تعذر تجهيز أو مشاركة الفاتورة: '+(e.message||e));}
 };
 window.sendArchivedSaleWhatsApp=async function(id){
  const {data:sale,error}=await sb.from('sales').select('id,invoice_number,customer_id,invoice_date,total_amount,paid_amount,remaining_amount').eq('id',id).single();

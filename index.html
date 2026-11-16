@@ -200,9 +200,13 @@ async function sendInvoiceImageToPhone(){
  try{
   const {blob,filename}=await createCurrentInvoiceImage();
   const file=new File([blob],filename,{type:'image/png'});
-  const message='فاتورة مبيعات من صن شاين للاستيراد والتصدير — رقم الفاتورة: '+($('invNo').value||'');
-  showPreparedInvoiceImageShare(file,message);
- }catch(e){alert('تعذر تجهيز صورة الفاتورة: '+(e.message||e));}
+  if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+   await navigator.share({files:[file],title:'صورة فاتورة '+filename,text:'فاتورة مبيعات من صن شاين للاستيراد والتصدير'});
+   return;
+  }
+  downloadInvoiceImage(blob,filename);
+  alert('تم تنزيل صورة الفاتورة. اختر واتساب ثم افتح محادثة العميل وأرفق الصورة من (+) ثم الصور.');
+ }catch(e){if(e?.name==='AbortError')return;alert('تعذر تجهيز أو مشاركة صورة الفاتورة: '+(e.message||e));}
 }
 async function sendInvoiceImageToCompanyGroup(){
  const groupUrl='https://chat.whatsapp.com/LPpf5RM4IeaHPpu4nKkQz8?s=hd&p=i&iam=2';
@@ -463,18 +467,16 @@ window.sendArchivedSalePdfToCompanyGroup=async function(id){
  try{const {blob,filename}=await createArchivedSalePdf(id);const file=new File([blob],filename,{type:'application/pdf'});if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'فاتورة '+filename,text:'فاتورة مبيعات من صن شاين للاستيراد والتصدير'});return;}downloadInvoicePdf(blob,filename);const w=window.open(groupUrl,'_blank');if(!w)window.location.href=groupUrl;alert('تم تنزيل PDF وفتح جروب الشركة. أرفق الملف داخل الجروب من (+) ثم مستند.');}catch(e){if(e?.name==='AbortError')return;alert('تعذر تجهيز أو مشاركة الفاتورة: '+(e.message||e));}
 };
 window.sendArchivedSaleImageToPhone=async function(id){
- const popup=window.open('about:blank','_blank');
  try{
-  const {imageBlob,imageFilename,sale,customer}=await createArchivedSalePdf(id);
-  const entered=prompt('أرسل صورة الفاتورة إلى رقم العميل المسجل، أو اكتب رقمًا آخر مع مفتاح الدولة:',customer?.phone||'');
-  if(entered===null){if(popup)popup.close();return}
-  const phone=normalizeWhatsAppPhone(entered||customer?.phone||'');
-  if(!phone){if(popup)popup.close();alert('رقم الهاتف غير صحيح أو غير مسجل.');return}
+  const {imageBlob,imageFilename,sale}=await createArchivedSalePdf(id);
+  const file=new File([imageBlob],imageFilename,{type:'image/png'});
+  if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+   await navigator.share({files:[file],title:'صورة فاتورة '+imageFilename,text:'فاتورة مبيعات من صن شاين للاستيراد والتصدير — رقم الفاتورة: '+sale.invoice_number});
+   return;
+  }
   downloadInvoiceImage(imageBlob,imageFilename);
-  const url='https://wa.me/'+phone;
-  if(popup)popup.location.href=url;else window.location.href=url;
-  alert('تم فتح محادثة العميل مباشرةً وتنزيل صورة الفاتورة. من داخل المحادثة اضغط (+) ثم الصور، واختر صورة الفاتورة واضغط إرسال.');
- }catch(e){if(popup)popup.close();alert('تعذر تجهيز صورة الفاتورة: '+(e.message||e))}
+  alert('تم تنزيل صورة الفاتورة. اختر واتساب ثم افتح محادثة العميل وأرفق الصورة من (+) ثم الصور.');
+ }catch(e){if(e?.name==='AbortError')return;alert('تعذر تجهيز أو مشاركة صورة الفاتورة: '+(e.message||e))}
 };
 window.sendArchivedSaleImageToCompanyGroup=async function(id){
  const groupUrl='https://chat.whatsapp.com/LPpf5RM4IeaHPpu4nKkQz8?s=hd&p=i&iam=2';

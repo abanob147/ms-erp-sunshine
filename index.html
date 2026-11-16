@@ -163,17 +163,24 @@ function showPreparedInvoiceImageShare(file, phone, customerName, message){
  const panel=document.createElement('div');panel.id='sunshineImageSharePanel';
  panel.style.cssText='position:fixed;z-index:999999;inset:auto 16px 16px 16px;background:#fff;border:2px solid #168b55;border-radius:14px;padding:16px;box-shadow:0 8px 32px #0004;direction:rtl;font-family:Arial,Tahoma,sans-serif;color:#222;max-width:520px;margin:auto';
  const supported=!!(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]}));
- panel.innerHTML='<div style="font-weight:700;margin-bottom:8px">تم تجهيز صورة الفاتورة</div><div style="font-size:14px;margin-bottom:12px">العميل: '+String(customerName||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))+' — '+String(phone)+'</div><button type="button" id="sunshineShareNow" style="background:#168b55;color:#fff;border:0;border-radius:8px;padding:12px 18px;font-weight:700;width:100%;cursor:pointer">'+(supported?'مشاركة الصورة الآن':'تنزيل الصورة')+'</button><button type="button" id="sunshineShareCancel" style="margin-top:8px;background:#eee;color:#333;border:0;border-radius:8px;padding:9px;width:100%;cursor:pointer">إغلاق</button><div style="font-size:12px;color:#666;margin-top:8px">'+(supported?'ستظهر قائمة المشاركة؛ اختر التطبيق والجهة التي تريد المشاركة معها بنفسك. لن يفتح النظام محادثة العميل تلقائيًا.':'هذا المتصفح لا يدعم مشاركة الصور مباشرة؛ سيتم تنزيل الصورة فقط دون فتح واتساب أو محادثة العميل.')+'</div>';
+ const safeName=String(customerName||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ panel.innerHTML='<div style="font-weight:700;margin-bottom:8px">تم تجهيز صورة الفاتورة بنجاح</div><div style="font-size:14px;margin-bottom:12px">العميل: '+safeName+' — '+String(phone)+'</div>'+
+ '<button type="button" id="sunshineShareNow" style="background:#168b55;color:#fff;border:0;border-radius:8px;padding:12px 18px;font-weight:700;width:100%;cursor:pointer">'+(supported?'اضغط هنا لمشاركة صورة الفاتورة':'تنزيل صورة الفاتورة')+'</button>'+
+ '<button type="button" id="sunshineOpenCustomerChat" style="margin-top:8px;background:#075e54;color:#fff;border:0;border-radius:8px;padding:11px;width:100%;cursor:pointer">فتح محادثة العميل في واتساب</button>'+
+ '<button type="button" id="sunshineShareCancel" style="margin-top:8px;background:#eee;color:#333;border:0;border-radius:8px;padding:9px;width:100%;cursor:pointer">إغلاق</button>'+
+ '<div style="font-size:12px;color:#666;margin-top:8px">اضغط مشاركة الصورة واختر واتساب ثم محادثة العميل. أو افتح المحادثة أولًا ثم ارجع واضغط مشاركة الصورة. لا يمكن للمتصفح إرسال الصورة دون تأكيد منك.</div>';
  document.body.appendChild(panel);
  panel.querySelector('#sunshineShareCancel').onclick=()=>panel.remove();
+ panel.querySelector('#sunshineOpenCustomerChat').onclick=()=>{window.open('https://wa.me/'+phone,'_blank','noopener');};
  panel.querySelector('#sunshineShareNow').onclick=async()=>{
+  // navigator.share must be invoked directly from this fresh button click,
+  // not after awaiting image generation in the original click handler.
   if(supported){
    try{await navigator.share({files:[file],title:'فاتورة '+file.name,text:message});panel.remove();}
    catch(e){if(e?.name!=='AbortError')alert('تعذرت مشاركة الصورة: '+(e.message||e));}
   }else{
-   downloadInvoiceImage(file, file.name);
-   alert('تم تنزيل صورة الفاتورة. هذا المتصفح لا يدعم نافذة المشاركة؛ لم يتم فتح واتساب أو محادثة العميل.');
-   panel.remove();
+   downloadInvoiceImage(file,file.name);
+   alert('تم تنزيل صورة الفاتورة. افتح محادثة العميل ثم أرفق الصورة من (+) ثم الصور.');
   }
  };
 }
@@ -184,26 +191,12 @@ async function sendInvoiceImageToPhone(){
  if(!customer){alert('تعذر العثور على بيانات العميل المختار.');return}
  const phone=normalizeWhatsAppPhone(customer.phone||'');
  if(!phone){alert('لا يوجد رقم هاتف مسجل لهذا العميل. أضف الرقم في بيانات العميل أولًا.');return}
- // نفتح نافذة احتياطية فور الضغط لتفادي حظر المتصفح عند الحاجة لفتح رابط واتساب بعد تجهيز الصورة.
- const popup=window.open('about:blank','_blank');
  try{
   const {blob,filename}=await createCurrentInvoiceImage();
   const file=new File([blob],filename,{type:'image/png'});
-  const message='صورة فاتورة مبيعات من صن شاين للاستيراد والتصدير\nالعميل: '+(customer.name||'')+'\nرقم العميل: '+(customer.phone||'')+'\nرقم الفاتورة: '+($('invNo')?.value||'');
-  let canShareFile=false;
-  try{canShareFile=!!(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]}));}catch(_){canShareFile=false;}
-  if(canShareFile){
-   if(popup)popup.close();
-   // مشاركة ملف الصورة نفسه؛ على الهاتف اختر WhatsApp ثم محادثة العميل.
-   await navigator.share({files:[file],title:'فاتورة '+filename,text:message});
-   return;
-  }
-  // بديل المتصفحات التي لا تدعم مشاركة الملفات: تنزيل الصورة وفتح محادثة العميل مباشرة.
-  downloadInvoiceImage(blob,filename);
-  const url='https://wa.me/'+phone;
-  if(popup)popup.location.href=url;else window.location.href=url;
-  alert('تم فتح محادثة العميل وتنزيل صورة الفاتورة. أرفق الصورة من (+) ثم الصور واضغط إرسال.');
- }catch(e){if(popup&&!popup.closed)popup.close();if(e?.name==='AbortError')return;alert('تعذر تجهيز أو مشاركة صورة الفاتورة: '+(e.message||e))}
+  const message='فاتورة مبيعات من صن شاين للاستيراد والتصدير — العميل: '+(customer.name||'')+' — رقم الفاتورة: '+($('invNo').value||'');
+  showPreparedInvoiceImageShare(file,phone,customer.name,message);
+ }catch(e){alert('تعذر تجهيز صورة الفاتورة: '+(e.message||e));}
 }
 async function sendInvoiceImageToCompanyGroup(){
  const groupUrl='https://chat.whatsapp.com/LPpf5RM4IeaHPpu4nKkQz8?s=hd&p=i&iam=2';

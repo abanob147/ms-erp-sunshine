@@ -82,7 +82,7 @@ async function loadItems(){
  const {data,error}=result;
  if(error){$('itemrows').innerHTML='<tr><td colspan="8">'+esc(error.message)+'</td></tr>';itemsCache=[];refreshInvoiceItemLists();return}
  itemsCache=data||[];
- $('itemrows').innerHTML=itemsCache.map(x=>{const priced=itemHasApprovedPrices(x),pending=x.awaiting_manager_pricing===true;return `<tr><td>${esc(x.sku)}</td><td>${esc(x.item_code)}</td><td>${esc(x.name)} ${pending?'<span class="pending-price">ينتظر التسعير</span>':''}</td><td>${esc(x.unit)}</td>${role==='admin'?`<td>${Number(x.purchase_price||0).toLocaleString()}</td>`:''}<td>${priced?Number(x.sale_price||0).toLocaleString():'—'}</td><td>${Number(x.opening_quantity||0).toLocaleString()}</td>${role==='admin'?`<td><button type="button" class="secondary" onclick="editItem('${String(x.id)}')">تعديل / تسعير</button> <button type="button" style="background:#a11" onclick="deleteItem('${String(x.id)}')">حذف</button></td>`:''}</tr>`}).join('');
+ $('itemrows').innerHTML=itemsCache.map(x=>{const priced=itemHasApprovedPrices(x),pending=!priced;return `<tr><td>${esc(x.sku)}</td><td>${esc(x.item_code)}</td><td>${esc(x.name)} ${pending?'<span class="pending-price">ينتظر التسعير</span>':''}</td><td>${esc(x.unit)}</td>${role==='admin'?`<td>${Number(x.purchase_price||0).toLocaleString()}</td>`:''}<td>${priced?Number(x.sale_price||0).toLocaleString():'—'}</td><td>${Number(x.opening_quantity||0).toLocaleString()}</td>${role==='admin'?`<td><button type="button" class="secondary" onclick="editItem('${String(x.id)}')">تعديل / تسعير</button> <button type="button" style="background:#a11" onclick="deleteItem('${String(x.id)}')">حذف</button></td>`:''}</tr>`}).join('');
  refreshInvoiceItemLists();
 }
 function printInventorySummary(){

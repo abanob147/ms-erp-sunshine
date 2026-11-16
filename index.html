@@ -722,7 +722,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
       const sr=await sb.from('sales').select('id,invoice_number').in('id',saleIds);
       if(!sr.error)invoiceNumbers=new Map((sr.data||[]).map(x=>[String(x.id),String(x.invoice_number||'')]));
       // جلب تفاصيل كل فاتورة ثم أسماء الأصناف لعرض جميع ما اشتراه العميل في خانة البيان.
-      const dr=await sb.from('sale_items').select('sale_id,item_id,quantity').in('sale_id',saleIds);
+      const dr=await sb.from('sale_items').select('sale_id,item_id,quantity,unit_price').in('sale_id',saleIds);
       if(!dr.error&&dr.data?.length){
         const itemIds=[...new Set(dr.data.map(d=>d.item_id).filter(v=>v!==null&&v!==undefined).map(String))];
         let itemNames=new Map();
@@ -733,7 +733,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
         for(const d of dr.data){
           const key=String(d.sale_id);
           if(!invoiceItems.has(key))invoiceItems.set(key,[]);
-          invoiceItems.get(key).push((itemNames.get(String(d.item_id))||'صنف غير معروف')+' × '+Number(d.quantity||0).toLocaleString('ar-EG'));
+          invoiceItems.get(key).push({name:itemNames.get(String(d.item_id))||'صنف غير معروف',quantity:Number(d.quantity||0),price:Number(d.unit_price||0)});
         }
       }
     }
@@ -757,8 +757,9 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
       const invoiceId=x.sale_invoice_id;
       const invoiceNo=invoiceId?(invoiceNumbers.get(String(invoiceId))||('#'+invoiceId)):'';
       const names=invoiceId?(invoiceItems.get(String(invoiceId))||[]):[];
-      const description=names.length?'أصناف الفاتورة: '+names.join('، '):(x.description||'');
-      return `<tr><td>${safe(x.transaction_date||'')}</td><td>${safe(description)}</td><td>${invoiceNo?safe(invoiceNo):'—'}</td><td>${fmt(x.debit)}</td><td>${fmt(x.credit)}</td><td>${fmt(x.balance)}</td></tr>`;
+      const description=names.length?names.map(item=>safe(item.name)+' × '+Number(item.quantity).toLocaleString('ar-EG')+' — '+fmt(item.price)+' جنيه').join(' | '):(x.description||'');
+      x.displayDescription=description;
+      return `<tr><td>${safe(x.transaction_date||'')}</td><td><span style="font-size:11px;line-height:1.6;font-weight:600">${description}</span></td><td>${invoiceNo?safe(invoiceNo):'—'}</td><td>${fmt(x.debit)}</td><td>${fmt(x.credit)}</td><td>${fmt(x.balance)}</td></tr>`;
     }).join('')||'<tr><td colspan="6">لا توجد حركات خلال الفترة المحددة.</td></tr>';
     el('statementRows').innerHTML=body;
     el('statementSummary').innerHTML=`<div class="finance-stat"><b>الرصيد السابق</b><strong>${fmt(opening)} جنيه</strong></div><div class="finance-stat"><b>إجمالي المدين</b><strong>${fmt(totalDebit)} جنيه</strong></div><div class="finance-stat"><b>إجمالي الدائن</b><strong>${fmt(totalCredit)} جنيه</strong></div><div class="finance-stat"><b>الرصيد النهائي</b><strong>${fmt(balance)} جنيه</strong></div>`;

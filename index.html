@@ -717,8 +717,26 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
     if(from&&to&&from>to){financeMsg('statementMsg','تاريخ البداية يجب أن يكون قبل تاريخ النهاية.',false);return}
     const raw=(data||[]).map(x=>({...x,debit:Number(x.debit||0),credit:Number(x.credit||0)}));
     const saleIds=[...new Set(raw.map(x=>x.sale_invoice_id).filter(Boolean).map(String))];
-    let invoiceNumbers=new Map();
-    if(saleIds.length){const sr=await sb.from('sales').select('id,invoice_number').in('id',saleIds);if(!sr.error)invoiceNumbers=new Map((sr.data||[]).map(x=>[String(x.id),String(x.invoice_number||'')]));}
+    let invoiceNumbers=new Map(),invoiceItems=new Map();
+    if(saleIds.length){
+      const sr=await sb.from('sales').select('id,invoice_number').in('id',saleIds);
+      if(!sr.error)invoiceNumbers=new Map((sr.data||[]).map(x=>[String(x.id),String(x.invoice_number||'')]));
+      // جلب تفاصيل كل فاتورة ثم أسماء الأصناف لعرض جميع ما اشتراه العميل في خانة البيان.
+      const dr=await sb.from('sale_items').select('sale_id,item_id,quantity').in('sale_id',saleIds);
+      if(!dr.error&&dr.data?.length){
+        const itemIds=[...new Set(dr.data.map(d=>d.item_id).filter(v=>v!==null&&v!==undefined).map(String))];
+        let itemNames=new Map();
+        if(itemIds.length){
+          const ir=await sb.from('items').select('id,name').in('id',itemIds);
+          if(!ir.error)itemNames=new Map((ir.data||[]).map(i=>[String(i.id),String(i.name||'صنف غير معروف')]));
+        }
+        for(const d of dr.data){
+          const key=String(d.sale_id);
+          if(!invoiceItems.has(key))invoiceItems.set(key,[]);
+          invoiceItems.get(key).push((itemNames.get(String(d.item_id))||'صنف غير معروف')+' × '+Number(d.quantity||0).toLocaleString('ar-EG'));
+        }
+      }
+    }
     // منع تكرار الفاتورة في الكشف وفي إجمالي الرصيد، حتى لو اختلف نص البيان.
     const seenInvoices=new Map(),all=[];
     for(const x of raw){
@@ -735,7 +753,13 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
     const rows=shown.map(x=>{balance+=x.debit-x.credit;return {...x,balance}});
     const totalDebit=shown.reduce((a,x)=>a+x.debit,0),totalCredit=shown.reduce((a,x)=>a+x.credit,0);
     const fmt=n=>Number(n||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2});
-    const body=rows.map(x=>{const invoiceId=x.sale_invoice_id;return `<tr><td>${safe(x.transaction_date||'')}</td><td>${safe(x.description||'')}</td><td>${invoiceId?safe(invoiceNumbers.get(String(invoiceId))||('#'+invoiceId)):'—'}</td><td>${fmt(x.debit)}</td><td>${fmt(x.credit)}</td><td>${fmt(x.balance)}</td></tr>`}).join('')||'<tr><td colspan="6">لا توجد حركات خلال الفترة المحددة.</td></tr>';
+    const body=rows.map(x=>{
+      const invoiceId=x.sale_invoice_id;
+      const invoiceNo=invoiceId?(invoiceNumbers.get(String(invoiceId))||('#'+invoiceId)):'';
+      const names=invoiceId?(invoiceItems.get(String(invoiceId))||[]):[];
+      const description=names.length?'أصناف الفاتورة: '+names.join('، '):(x.description||'');
+      return `<tr><td>${safe(x.transaction_date||'')}</td><td>${safe(description)}</td><td>${invoiceNo?safe(invoiceNo):'—'}</td><td>${fmt(x.debit)}</td><td>${fmt(x.credit)}</td><td>${fmt(x.balance)}</td></tr>`;
+    }).join('')||'<tr><td colspan="6">لا توجد حركات خلال الفترة المحددة.</td></tr>';
     el('statementRows').innerHTML=body;
     el('statementSummary').innerHTML=`<div class="finance-stat"><b>الرصيد السابق</b><strong>${fmt(opening)} جنيه</strong></div><div class="finance-stat"><b>إجمالي المدين</b><strong>${fmt(totalDebit)} جنيه</strong></div><div class="finance-stat"><b>إجمالي الدائن</b><strong>${fmt(totalCredit)} جنيه</strong></div><div class="finance-stat"><b>الرصيد النهائي</b><strong>${fmt(balance)} جنيه</strong></div>`;
     el('statementPrintMeta').textContent='العميل: '+customer.name+' | الفترة: '+(from||'من البداية')+' إلى '+(to||'حتى الآن');

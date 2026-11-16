@@ -757,7 +757,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
       const invoiceId=x.sale_invoice_id;
       const invoiceNo=invoiceId?(invoiceNumbers.get(String(invoiceId))||('#'+invoiceId)):'';
       const names=invoiceId?(invoiceItems.get(String(invoiceId))||[]):[];
-      const description=names.length?names.map(item=>safe(item.name)+' × '+Number(item.quantity).toLocaleString('ar-EG')+' — '+fmt(item.price)+' جنيه').join(' | '):(x.description||'');
+      const description=names.length?names.map(item=>safe(item.name)+' × '+Number(item.quantity).toLocaleString('ar-EG')+' × '+fmt(item.price)+' جنيه').join(' | '):(x.description||'');
       x.displayDescription=description;
       return `<tr><td>${safe(x.transaction_date||'')}</td><td><span style="font-size:11px;line-height:1.6;font-weight:600">${description}</span></td><td>${invoiceNo?safe(invoiceNo):'—'}</td><td>${fmt(x.debit)}</td><td>${fmt(x.credit)}</td><td>${fmt(x.balance)}</td></tr>`;
     }).join('')||'<tr><td colspan="6">لا توجد حركات خلال الفترة المحددة.</td></tr>';

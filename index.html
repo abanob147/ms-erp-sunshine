@@ -184,14 +184,26 @@ async function sendInvoiceImageToPhone(){
  if(!customer){alert('تعذر العثور على بيانات العميل المختار.');return}
  const phone=normalizeWhatsAppPhone(customer.phone||'');
  if(!phone){alert('لا يوجد رقم هاتف مسجل لهذا العميل. أضف الرقم في بيانات العميل أولًا.');return}
+ // نفتح نافذة احتياطية فور الضغط لتفادي حظر المتصفح عند الحاجة لفتح رابط واتساب بعد تجهيز الصورة.
  const popup=window.open('about:blank','_blank');
  try{
   const {blob,filename}=await createCurrentInvoiceImage();
+  const file=new File([blob],filename,{type:'image/png'});
+  const message='صورة فاتورة مبيعات من صن شاين للاستيراد والتصدير\nالعميل: '+(customer.name||'')+'\nرقم العميل: '+(customer.phone||'')+'\nرقم الفاتورة: '+($('invNo')?.value||'');
+  let canShareFile=false;
+  try{canShareFile=!!(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]}));}catch(_){canShareFile=false;}
+  if(canShareFile){
+   if(popup)popup.close();
+   // مشاركة ملف الصورة نفسه؛ على الهاتف اختر WhatsApp ثم محادثة العميل.
+   await navigator.share({files:[file],title:'فاتورة '+filename,text:message});
+   return;
+  }
+  // بديل المتصفحات التي لا تدعم مشاركة الملفات: تنزيل الصورة وفتح محادثة العميل مباشرة.
   downloadInvoiceImage(blob,filename);
   const url='https://wa.me/'+phone;
   if(popup)popup.location.href=url;else window.location.href=url;
-  alert('تم فتح محادثة العميل مباشرةً وتنزيل صورة الفاتورة. من داخل المحادثة اضغط (+) ثم الصور، واختر صورة الفاتورة واضغط إرسال.');
- }catch(e){if(popup)popup.close();alert('تعذر تجهيز صورة الفاتورة: '+(e.message||e))}
+  alert('تم فتح محادثة العميل وتنزيل صورة الفاتورة. أرفق الصورة من (+) ثم الصور واضغط إرسال.');
+ }catch(e){if(popup&&!popup.closed)popup.close();if(e?.name==='AbortError')return;alert('تعذر تجهيز أو مشاركة صورة الفاتورة: '+(e.message||e))}
 }
 async function sendInvoiceImageToCompanyGroup(){
  const groupUrl='https://chat.whatsapp.com/LPpf5RM4IeaHPpu4nKkQz8?s=hd&p=i&iam=2';

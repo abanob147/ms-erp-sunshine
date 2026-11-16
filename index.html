@@ -1438,9 +1438,19 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
   }
   async function refreshVisiblePage(){
     if(refreshing||!window.sb||!role||!$rt('application')||$rt('application').classList.contains('hidden'))return;
-    if(userIsEditing()){refreshQueued=true;return}
+    const page=currentPage();
+    // أرشيف الفواتير مستقل عن نموذج إنشاء الفاتورة؛ حدّثه حتى لو كان المؤشر داخل أحد حقول الفاتورة.
+    if(userIsEditing()){
+      if(page==='sales' && !$rt('salesArchive')?.classList.contains('hidden')){
+        refreshing=true;refreshQueued=false;lastRefreshAt=Date.now();
+        try{await window.loadSalesArchive?.()}catch(e){console.warn('Sunshine archive refresh failed:',e)}
+        finally{refreshing=false}
+        return;
+      }
+      refreshQueued=true;return;
+    }
     refreshing=true;refreshQueued=false;
-    const page=currentPage();lastRefreshAt=Date.now();
+    lastRefreshAt=Date.now();
     try{
       if(page==='dashboard'){
         if(role==='admin'&&window.loadAdminProfitDashboard)await window.loadAdminProfitDashboard();

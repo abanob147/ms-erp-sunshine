@@ -32,7 +32,7 @@
 <div><label>العملة</label><select id="invCurrency"><option value="EGP">جنيه مصري</option></select></div>
 </div>
 <div class="scroll"><table id="invoiceTable"><thead><tr><th>الصنف / البيان</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th><th class="no-print">حذف</th></tr></thead><tbody id="invoiceRows"></tbody></table></div>
-<div class="invoice-actions no-print"><button type="button" onclick="addInvoiceRow()">إضافة صنف</button><button id="saveInvoiceBtn" type="button" onclick="saveInvoice()">حفظ الفاتورة</button><button id="cancelSaleEditBtn" type="button" class="secondary hidden" onclick="cancelSaleEdit()">إلغاء تعديل الفاتورة</button><button type="button" style="background:#168b55" onclick="sendInvoiceImageToPhone()">إرسال صورة الفاتورة للعميل</button><button type="button" style="background:#0b7285" onclick="sendInvoicePdfToPhone()">إرسال PDF للعميل / رقم آخر</button><button type="button" style="background:#075e54" onclick="sendInvoicePdfToCompanyGroup()">إرسال PDF الفاتورة للجروب</button><button type="button" class="secondary" onclick="loadSalesArchive()">أرشيف الفواتير</button><button type="button" onclick="window.print()">طباعة الفاتورة</button></div><p id="salesmsg" class="msg no-print"></p><div id="salesArchive" class="no-print hidden"><h3>أرشيف الفواتير</h3><div class="scroll"><table><thead><tr><th>رقم الفاتورة</th><th>اسم العميل</th><th>التاريخ</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>العملة</th><th>الإجراءات</th></tr></thead><tbody id="archiveRows"></tbody></table></div></div>
+<div class="invoice-actions no-print"><button type="button" onclick="addInvoiceRow()">إضافة صنف</button><button id="saveInvoiceBtn" type="button" onclick="saveInvoice()">حفظ الفاتورة</button><button id="cancelSaleEditBtn" type="button" class="secondary hidden" onclick="cancelSaleEdit()">إلغاء تعديل الفاتورة</button><button type="button" style="background:#168b55" onclick="sendInvoiceImageToPhone()">إرسال صورة الفاتورة للعميل</button><button type="button" style="background:#0b7285" onclick="sendInvoicePdfToPhone()">إرسال PDF للعميل</button><button type="button" style="background:#075e54" onclick="sendInvoicePdfToCompanyGroup()">إرسال PDF الفاتورة للجروب</button><button type="button" class="secondary" onclick="loadSalesArchive()">أرشيف الفواتير</button><button type="button" onclick="window.print()">طباعة الفاتورة</button></div><p id="salesmsg" class="msg no-print"></p><div id="salesArchive" class="no-print hidden"><h3>أرشيف الفواتير</h3><div class="scroll"><table><thead><tr><th>رقم الفاتورة</th><th>اسم العميل</th><th>التاريخ</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>العملة</th><th>الإجراءات</th></tr></thead><tbody id="archiveRows"></tbody></table></div></div>
 <div class="invoice-total"><div><b>الإجمالي</b><strong id="invGrand">0.00</strong></div><div><b>المدفوع</b><input id="invPaid" type="number" min="0" value="0" oninput="calcInvoice()" style="max-width:140px"></div><div><b>المتبقي</b><strong id="invDue">0.00</strong></div></div><div class="invoice-notes"><label for="invNotes">ملاحظات</label><textarea id="invNotes" rows="3" placeholder="اكتب أي ملاحظات خاصة بالفاتورة هنا..."></textarea></div><div style="margin-top:28px;border-top:1px solid #aaa;padding-top:10px;text-align:center;font-weight:800">شكرًا لتعاملكم معنا</div>
 </div><p class="muted no-print">راجع الأصناف والكميات والأسعار قبل الحفظ. الحفظ يخصم المخزون من قاعدة البيانات من خلال عملية واحدة.</p></div>
 <div id="placeholder" class="card hidden"><h3 id="placeholderTitle"></h3><p class="muted">هذه الوحدة في مرحلة التوصيل بقاعدة البيانات.</p></div></main></div></section></div>
@@ -148,20 +148,17 @@ async function sendInvoicePdfToCompanyGroup(){
 async function sendInvoicePdfToPhone(){
  const selected=$('customerSelect')?.value;
  const customer=selected!==undefined&&selected!==null&&selected!==''?customersCache[Number(selected)]:null;
- if(!customer&&!$('invPhone').value.trim()){alert('اختر عميلًا مسجلًا أو أدخل رقم هاتف العميل أولًا.');return}
- const defaultPhone=customer?.phone||$('invPhone').value||'';
- const entered=prompt('أرسل إلى رقم العميل المسجل، أو اكتب رقمًا آخر مع مفتاح الدولة. اتركه فارغًا لاستخدام رقم العميل:',defaultPhone);
- if(entered===null)return;
- const phone=normalizeWhatsAppPhone(entered||defaultPhone);
- if(!phone){alert('رقم الهاتف غير صحيح.');return}
+ const phone=normalizeWhatsAppPhone(customer?.phone||$('invPhone')?.value||'');
+ if(!customer){alert('اختر العميل المسجل من قائمة العملاء أولًا حتى يتم الإرسال إلى رقمه المحفوظ.');return}
+ if(!phone){alert('لا يوجد رقم هاتف مسجل لهذا العميل. أضف رقم الهاتف في بيانات العملاء أولًا.');return}
  const popup=window.open('about:blank','_blank');
  try{
   const {blob,filename}=await createCurrentInvoicePdf();
-  const message='فاتورة مبيعات من صن شاين للاستيراد والتصدير — العميل: '+(customer?.name||$('invCustomer').value||'')+' — رقم الفاتورة: '+($('invNo').value||'');
+  const message='فاتورة مبيعات من صن شاين للاستيراد والتصدير — العميل: '+(customer.name||'')+' — رقم الفاتورة: '+($('invNo').value||'');
   downloadInvoicePdf(blob,filename);
   const url='https://wa.me/'+phone+'?text='+encodeURIComponent(message+'\nتم تجهيز ملف PDF. أرفقه من (+) ثم مستند.');
   if(popup)popup.location.href=url;else window.location.href=url;
-  alert('تم تجهيز ملف PDF وفتح محادثة الرقم المحدد. داخل واتساب اضغط (+) ثم مستند واختر ملف الفاتورة الذي تم تنزيله.');
+  alert('تم تجهيز ملف PDF وفتح محادثة العميل على رقمه المسجل. داخل واتساب اضغط (+) ثم مستند واختر ملف الفاتورة الذي تم تنزيله.');
  }catch(e){if(popup)popup.close();alert('تعذر تجهيز الفاتورة PDF: '+(e.message||e));}
 }
 async function createCurrentInvoiceImage(){
@@ -387,7 +384,22 @@ async function loadSalesArchive(){
   const {data,error}=await sb.from('sales').select('id,invoice_number,customer_id,invoice_date,total_amount,paid_amount,remaining_amount,currency').order('invoice_date',{ascending:false}).limit(100);
   if(error){$('archiveRows').innerHTML='<tr><td colspan="8">تعذر تحميل الأرشيف: '+esc(error.message)+'</td></tr>';return}
   const customerNames=new Map(customersCache.map(c=>[String(c.id),c.name]));
-  $('archiveRows').innerHTML=(data||[]).map(x=>{const id=String(x.id).replace(/'/g,'');const editBtn=role==='admin'?` <button type="button" onclick="editSaleInvoice('${id}')">تعديل الفاتورة</button>`:'';return `<tr><td>${esc(x.invoice_number)}</td><td>${esc(customerNames.get(String(x.customer_id))||'غير محدد')}</td><td>${esc(x.invoice_date)}</td><td>${Number(x.total_amount||0).toLocaleString()}</td><td>${Number(x.paid_amount||0).toLocaleString()}</td><td>${Number(x.remaining_amount||0).toLocaleString()}</td><td>${esc(x.currency)}</td><td><button type="button" class="secondary" onclick="showSaleDetails('${id}')">عرض</button> <button type="button" onclick="printArchivedSale('${id}')">PDF</button> <button type="button" style="background:#168b55" onclick="sendArchivedSaleImageToPhone('${id}')">إرسال صورة للعميل</button> <button type="button" style="background:#0b7285" onclick="sendArchivedSalePdfToPhone('${id}')">إرسال PDF للعميل / رقم آخر</button> <button type="button" style="background:#075e54" onclick="sendArchivedSalePdfToCompanyGroup('${id}')">إرسال PDF للجروب</button>${editBtn}</td></tr>`}).join('')||'<tr><td colspan="8">لا توجد فواتير محفوظة.</td></tr>';
+  $('archiveRows').innerHTML=(data||[]).map(x=>{const id=String(x.id).replace(/'/g,'');const editBtn=role==='admin'?` <button type="button" onclick="editSaleInvoice('${id}')">تعديل الفاتورة</button> <button type="button" style="background:#a11" onclick="deleteArchivedSale('${id}')">مسح الفاتورة</button>`:'';return `<tr><td>${esc(x.invoice_number)}</td><td>${esc(customerNames.get(String(x.customer_id))||'غير محدد')}</td><td>${esc(x.invoice_date)}</td><td>${Number(x.total_amount||0).toLocaleString()}</td><td>${Number(x.paid_amount||0).toLocaleString()}</td><td>${Number(x.remaining_amount||0).toLocaleString()}</td><td>${esc(x.currency)}</td><td><button type="button" class="secondary" onclick="showSaleDetails('${id}')">عرض</button> <button type="button" onclick="printArchivedSale('${id}')">PDF</button> <button type="button" style="background:#168b55" onclick="sendArchivedSaleImageToPhone('${id}')">إرسال صورة للعميل</button> <button type="button" style="background:#0b7285" onclick="sendArchivedSalePdfToPhone('${id}')">إرسال PDF للعميل</button> <button type="button" style="background:#075e54" onclick="sendArchivedSalePdfToCompanyGroup('${id}')">إرسال PDF للجروب</button>${editBtn}</td></tr>`}).join('')||'<tr><td colspan="8">لا توجد فواتير محفوظة.</td></tr>';
+}
+async function deleteArchivedSale(id){
+  if(role!=='admin'){alert('مسح الفواتير متاح للمدير فقط.');return;}
+  const row=[...document.querySelectorAll('#archiveRows tr')].find(tr=>tr.innerHTML.includes(`deleteArchivedSale('${id}')`));
+  const invoiceNo=row?.cells?.[0]?.textContent?.trim()||id;
+  if(!confirm('تأكيد مسح الفاتورة '+invoiceNo+' نهائيًا؟\nسيتم حذف تفاصيلها من كشف حساب العميل وإعادة كمياتها إلى المخزون. لا يمكن التراجع عن العملية.'))return;
+  try{
+    const {data,error}=await sb.rpc('admin_delete_sale_invoice',{p_sale_id:Number(id)});
+    if(error)throw error;
+    if(!data||data.success!==true)throw new Error(data?.message||'لم يتم حذف الفاتورة.');
+    msg('salesmsg','تم مسح الفاتورة '+invoiceNo+' وإعادة الكميات للمخزون بنجاح.',true);
+    await loadSalesArchive();
+    await loadItems();
+    if(typeof window.refreshFinancePage==='function')await window.refreshFinancePage();
+  }catch(e){alert('تعذر مسح الفاتورة: '+(e.message||e)+'\nتأكد من تشغيل ملف SQL المرفق في Supabase أولاً.');}
 }
 function invoicePrintWindow(title, subtitle, rows, totals, companyContact=''){
   const w=window.open('','_blank','width=900,height=700');
@@ -437,15 +449,13 @@ window.sendArchivedSalePdfToPhone=async function(id){
  const popup=window.open('about:blank','_blank');
  try{
   const {blob,filename,sale,customer}=await createArchivedSalePdf(id);
-  const entered=prompt('أرسل PDF إلى رقم العميل المسجل، أو اكتب رقمًا آخر مع مفتاح الدولة:',customer?.phone||'');
-  if(entered===null){if(popup)popup.close();return}
-  const phone=normalizeWhatsAppPhone(entered||customer?.phone||'');
-  if(!phone){if(popup)popup.close();alert('رقم الهاتف غير صحيح أو غير مسجل.');return}
+  const phone=normalizeWhatsAppPhone(customer?.phone||'');
+  if(!phone){if(popup)popup.close();alert('لا يوجد رقم هاتف مسجل لهذا العميل. أضف رقم الهاتف في بيانات العملاء ثم أعد المحاولة.');return}
   const message='فاتورة مبيعات من صن شاين للاستيراد والتصدير — العميل: '+(customer?.name||'')+' — رقم الفاتورة: '+sale.invoice_number;
   downloadInvoicePdf(blob,filename);
   const url='https://wa.me/'+phone+'?text='+encodeURIComponent(message+'\nتم تجهيز ملف PDF. أرفقه من (+) ثم مستند.');
   if(popup)popup.location.href=url;else window.location.href=url;
-  alert('تم تجهيز PDF وفتح محادثة الرقم المحدد. أرفق الملف من (+) ثم مستند.');
+  alert('تم تجهيز PDF وفتح محادثة العميل على رقمه المسجل. أرفق الملف من (+) ثم مستند.');
  }catch(e){if(popup)popup.close();alert('تعذر تجهيز الفاتورة PDF: '+(e.message||e));}
 };
 window.sendArchivedSalePdfToCompanyGroup=async function(id){

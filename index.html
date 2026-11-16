@@ -339,7 +339,7 @@ async function saveInvoice(){
     const minimumPrice=Number(item.purchase_price||0);if(role!=='admin'&&unitPrice<minimumPrice){msg('salesmsg','سعر بيع الصنف «'+item.name+'» لا يجوز أن يقل عن سعر الشراء ('+minimumPrice.toLocaleString('ar-EG')+' جنيه).',false);return}
     lines.push({item_id:Number(item.id),quantity,unit_price:unitPrice});
   }
-  const total=lines.reduce((sum,x)=>sum+x.quantity*x.unit_price,0),paid=Number($('invPaid').value||0),invoiceNo=$('invNo').value.trim();
+  const total=lines.reduce((sum,x)=>sum+x.quantity*x.unit_price,0),paid=Number($('invPaid').value||0);let invoiceNo=$('invNo').value.trim();
   if(!invoiceNo){msg('salesmsg','اكتب رقم الفاتورة',false);return}
   if(!Number.isFinite(paid)||paid<0||paid>total){msg('salesmsg','المدفوع يجب أن يكون بين صفر وإجمالي الفاتورة',false);return}
   let customerId=null;
@@ -1577,7 +1577,7 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
     const app = document.getElementById('application');
     const archive = document.getElementById('salesArchive');
     const title = document.getElementById('pageTitle');
-    if (document.hidden || !window.sb || !window.role || !app || app.classList.contains('hidden')) return;
+    if (document.hidden || !window.sb || typeof role === 'undefined' || !role || !app || app.classList.contains('hidden')) return;
     if (!title || title.textContent.trim() !== 'المبيعات' || !archive || archive.classList.contains('hidden')) return;
     if (busy || typeof window.loadSalesArchive !== 'function') return;
     busy = true;

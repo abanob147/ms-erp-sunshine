@@ -1407,4 +1407,106 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
   };
 })();
 </script>
+<script>
+/* Sunshine ERP: live synchronization across all signed-in accounts */
+(function(){
+  let realtimeChannel=null, refreshTimer=null, refreshQueued=false, lastRefreshAt=0;
+  const watchedTables=['items','customers','sales','sale_items','customer_transactions','account_transactions','bank_accounts','company_checks','company_settings','import_shipments','purchases','purchase_items','supplier_ledger','suppliers','operating_expenses','accounts'];
+  const $rt=id=>document.getElementById(id);
+  function realtimeStatus(text,ok){
+    let node=$rt('sunshineRealtimeStatus');
+    if(!node){node=document.createElement('span');node.id='sunshineRealtimeStatus';node.style.cssText='display:inline-block;margin-inline:8px;padding:5px 9px;border-radius:8px;background:#ffffff22;color:#fff;font-size:12px;font-weight:700';$rt('topuser')?.insertBefore(node,$rt('topuser').firstChild)}
+    node.textContent=text;node.title='حالة الاتصال المباشر بقاعدة البيانات';node.style.background=ok?'#16764e':'#8a4b08';
+  }
+  function currentPage(){
+    const title=$rt('pageTitle')?.textContent?.trim()||'';
+    const map={'لوحة التحكم':'dashboard','الأصناف والمخزون':'items','شحنات الاستيراد':'shipments','المبيعات':'sales','العملاء':'customers','المشتريات':'purchases','الموردون':'suppliers','شؤون الموظفين':'hr','الحسابات والخزينة':'accounts','الشيكات':'checks','التقارير':'reports','إعدادات المدير':'settings','أرقام الحسابات':'bank-directory'};
+    return map[title]||'dashboard';
+  }
+  function userIsEditing(){
+    const a=document.activeElement;
+    if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))return true;
+    // Avoid replacing forms containing unsaved user input.
+    const page=currentPage();
+    const roots=page==='sales'?[$rt('invoicePrint')]:page==='items'?[$rt('items')]:page==='customers'?[$rt('customers')]:[$rt('placeholder')];
+    return roots.some(root=>root&&[...root.querySelectorAll('input:not([readonly]),textarea,select')].some(el=>el.value&&el.value!==el.defaultValue&&el.type!=='date'));
+  }
+  async function refreshVisiblePage(){
+    if(!window.sb||!role||!$rt('application')||$rt('application').classList.contains('hidden'))return;
+    if(userIsEditing()){refreshQueued=true;return}
+    refreshQueued=false;
+    const page=currentPage();
+    lastRefreshAt=Date.now();
+    try{
+      if(page==='dashboard'){
+        if(role==='admin'&&window.loadAdminProfitDashboard)await window.loadAdminProfitDashboard();
+      }else if(page==='items'){
+        await window.loadItems?.();
+      }else if(page==='customers'){
+        await window.loadCustomers?.();
+      }else if(page==='shipments'){
+        if(role==='admin')await window.loadShipments?.();
+      }else if(page==='sales'){
+        // Keep the invoice being composed intact; refresh shared lookup data and archive only.
+        await window.loadItems?.();await window.loadCustomers?.();
+        if(!$rt('salesArchive')?.classList.contains('hidden'))await window.loadSalesArchive?.();
+        if(role==='admin'&&window.loadAdminProfitDashboard)await window.loadAdminProfitDashboard();
+      }else if(page==='accounts'){
+        if(window.refreshFinancePage)await window.refreshFinancePage();
+        else if(window.openPage)window.openPage(page,null);
+      }else if(page==='checks'){
+        if(window.openPage)window.openPage('checks',null);
+      }else if(page==='purchases'){
+        if(window.purchaseLoad)await window.purchaseLoad();
+      }else if(page==='suppliers'){
+        if(window.loadSuppliers)await window.loadSuppliers();
+      }else if(page==='hr'){
+        if(role==='admin'&&window.sunshineHrLoad)await window.sunshineHrLoad();
+      }else if(page==='bank-directory'){
+        if(window.sunshineDirectoryLoad)await window.sunshineDirectoryLoad();
+      }else if(page==='settings'){
+        // Settings form is intentionally left untouched while open.
+      }else if(page==='reports'){
+        // Reports are refreshed when reopened to avoid replacing report filters mid-use.
+      }
+      if(role==='admin'&&window.loadCheckAlertBadge)await window.loadCheckAlertBadge();
+    }catch(e){console.warn('Sunshine live refresh failed:',e)}
+  }
+  function queueRefresh(){
+    if(refreshTimer)clearTimeout(refreshTimer);
+    refreshTimer=setTimeout(()=>{refreshTimer=null;refreshVisiblePage()},450);
+  }
+  function startRealtime(){
+    if(!window.sb||!role)return;
+    if(realtimeChannel){try{sb.removeChannel(realtimeChannel)}catch(e){}realtimeChannel=null}
+    let channel=sb.channel('sunshine-erp-live-sync');
+    watchedTables.forEach(table=>{
+      channel=channel.on('postgres_changes',{event:'*',schema:'public',table},payload=>{
+        // Any insert/update/delete in a watched business table prompts the visible view to refresh.
+        console.debug('Sunshine realtime:',table,payload?.eventType);
+        queueRefresh();
+      });
+    });
+    realtimeChannel=channel.subscribe(status=>{
+      if(status==='SUBSCRIBED')realtimeStatus('متصل مباشرًا',true);
+      else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED')realtimeStatus('المزامنة غير متصلة',false);
+    });
+  }
+  document.addEventListener('focusout',()=>{if(refreshQueued)setTimeout(queueRefresh,150)});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&window.sb&&role&&Date.now()-lastRefreshAt>15000){lastRefreshAt=Date.now();queueRefresh()}});
+  const originalEnter=window.enterApp;
+  if(typeof originalEnter==='function'){
+    window.enterApp=async function(){
+      await originalEnter.apply(this,arguments);
+      if(role){startRealtime();realtimeStatus('جارٍ الاتصال المباشر…',false)}
+    };
+  }
+  const originalLogout=window.logout;
+  if(typeof originalLogout==='function'){
+    window.logout=async function(){if(realtimeChannel){try{await sb.removeChannel(realtimeChannel)}catch(e){}realtimeChannel=null}return originalLogout.apply(this,arguments)};
+  }
+  window.sunshineRestartRealtime=startRealtime;
+})();
+
+</script>
 </body></html>

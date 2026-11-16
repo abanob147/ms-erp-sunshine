@@ -1408,10 +1408,16 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
 })();
 </script>
 <script>
-/* Sunshine ERP: live synchronization across all signed-in accounts */
+/* Sunshine ERP: reliable live synchronization across all signed-in accounts */
 (function(){
   let realtimeChannel=null, refreshTimer=null, refreshQueued=false, lastRefreshAt=0;
-  const watchedTables=['items','customers','sales','sale_items','customer_transactions','account_transactions','bank_accounts','company_checks','company_settings','import_shipments','purchases','purchase_items','supplier_ledger','suppliers','operating_expenses','accounts'];
+  let fallbackTimer=null, refreshing=false, reconnectTimer=null;
+  const watchedTables=[
+    'items','customers','sales','sale_items','customer_transactions',
+    'account_transactions','bank_accounts','company_checks','company_settings',
+    'import_shipments','purchases','purchase_items','supplier_ledger',
+    'suppliers','operating_expenses','accounts'
+  ];
   const $rt=id=>document.getElementById(id);
   function realtimeStatus(text,ok){
     let node=$rt('sunshineRealtimeStatus');
@@ -1426,17 +1432,15 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
   function userIsEditing(){
     const a=document.activeElement;
     if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))return true;
-    // Avoid replacing forms containing unsaved user input.
     const page=currentPage();
     const roots=page==='sales'?[$rt('invoicePrint')]:page==='items'?[$rt('items')]:page==='customers'?[$rt('customers')]:[$rt('placeholder')];
     return roots.some(root=>root&&[...root.querySelectorAll('input:not([readonly]),textarea,select')].some(el=>el.value&&el.value!==el.defaultValue&&el.type!=='date'));
   }
   async function refreshVisiblePage(){
-    if(!window.sb||!role||!$rt('application')||$rt('application').classList.contains('hidden'))return;
+    if(refreshing||!window.sb||!role||!$rt('application')||$rt('application').classList.contains('hidden'))return;
     if(userIsEditing()){refreshQueued=true;return}
-    refreshQueued=false;
-    const page=currentPage();
-    lastRefreshAt=Date.now();
+    refreshing=true;refreshQueued=false;
+    const page=currentPage();lastRefreshAt=Date.now();
     try{
       if(page==='dashboard'){
         if(role==='admin'&&window.loadAdminProfitDashboard)await window.loadAdminProfitDashboard();
@@ -1447,7 +1451,7 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
       }else if(page==='shipments'){
         if(role==='admin')await window.loadShipments?.();
       }else if(page==='sales'){
-        // Keep the invoice being composed intact; refresh shared lookup data and archive only.
+        // لا نلمس الفاتورة الجاري إعدادها؛ نحدّث بيانات الاختيار والأرشيف فقط.
         await window.loadItems?.();await window.loadCustomers?.();
         if(!$rt('salesArchive')?.classList.contains('hidden'))await window.loadSalesArchive?.();
         if(role==='admin'&&window.loadAdminProfitDashboard)await window.loadAdminProfitDashboard();
@@ -1455,7 +1459,8 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
         if(window.refreshFinancePage)await window.refreshFinancePage();
         else if(window.openPage)window.openPage(page,null);
       }else if(page==='checks'){
-        if(window.openPage)window.openPage('checks',null);
+        if(window.refreshChecksPage)await window.refreshChecksPage();
+        else if(window.openPage)window.openPage('checks',null);
       }else if(page==='purchases'){
         if(window.purchaseLoad)await window.purchaseLoad();
       }else if(page==='suppliers'){
@@ -1464,36 +1469,50 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
         if(role==='admin'&&window.sunshineHrLoad)await window.sunshineHrLoad();
       }else if(page==='bank-directory'){
         if(window.sunshineDirectoryLoad)await window.sunshineDirectoryLoad();
-      }else if(page==='settings'){
-        // Settings form is intentionally left untouched while open.
-      }else if(page==='reports'){
-        // Reports are refreshed when reopened to avoid replacing report filters mid-use.
       }
       if(role==='admin'&&window.loadCheckAlertBadge)await window.loadCheckAlertBadge();
     }catch(e){console.warn('Sunshine live refresh failed:',e)}
+    finally{refreshing=false}
   }
   function queueRefresh(){
     if(refreshTimer)clearTimeout(refreshTimer);
-    refreshTimer=setTimeout(()=>{refreshTimer=null;refreshVisiblePage()},450);
+    refreshTimer=setTimeout(()=>{refreshTimer=null;refreshVisiblePage()},350);
+  }
+  function startFallback(){
+    if(fallbackTimer)clearInterval(fallbackTimer);
+    // شبكة احتياطية عند تعطيل Realtime أو عدم إدراج جدول في supabase_realtime.
+    fallbackTimer=setInterval(()=>{
+      if(!document.hidden&&window.sb&&role&&Date.now()-lastRefreshAt>=9000)queueRefresh();
+    },10000);
   }
   function startRealtime(){
     if(!window.sb||!role)return;
     if(realtimeChannel){try{sb.removeChannel(realtimeChannel)}catch(e){}realtimeChannel=null}
-    let channel=sb.channel('sunshine-erp-live-sync');
+    realtimeStatus('جارٍ الاتصال المباشر…',false);
+    let channel=sb.channel('sunshine-erp-live-sync-'+String(role));
     watchedTables.forEach(table=>{
       channel=channel.on('postgres_changes',{event:'*',schema:'public',table},payload=>{
-        // Any insert/update/delete in a watched business table prompts the visible view to refresh.
         console.debug('Sunshine realtime:',table,payload?.eventType);
         queueRefresh();
       });
     });
     realtimeChannel=channel.subscribe(status=>{
-      if(status==='SUBSCRIBED')realtimeStatus('متصل مباشرًا',true);
-      else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED')realtimeStatus('المزامنة غير متصلة',false);
+      if(status==='SUBSCRIBED'){
+        realtimeStatus('متصل مباشرًا',true);
+        queueRefresh();
+      }else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
+        realtimeStatus('المزامنة الاحتياطية تعمل',false);
+        if(reconnectTimer)clearTimeout(reconnectTimer);
+        reconnectTimer=setTimeout(()=>{if(window.sb&&role)startRealtime()},12000);
+      }
     });
+    startFallback();
   }
-  document.addEventListener('focusout',()=>{if(refreshQueued)setTimeout(queueRefresh,150)});
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&window.sb&&role&&Date.now()-lastRefreshAt>15000){lastRefreshAt=Date.now();queueRefresh()}});
+  document.addEventListener('focusout',()=>{if(refreshQueued)setTimeout(queueRefresh,250)});
+  document.addEventListener('visibilitychange',()=>{
+    if(!document.hidden&&window.sb&&role){if(Date.now()-lastRefreshAt>3000)queueRefresh();if(!realtimeChannel)startRealtime()}
+  });
+  window.addEventListener('online',()=>{if(window.sb&&role)startRealtime()});
   const originalEnter=window.enterApp;
   if(typeof originalEnter==='function'){
     window.enterApp=async function(){
@@ -1503,10 +1522,15 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
   }
   const originalLogout=window.logout;
   if(typeof originalLogout==='function'){
-    window.logout=async function(){if(realtimeChannel){try{await sb.removeChannel(realtimeChannel)}catch(e){}realtimeChannel=null}return originalLogout.apply(this,arguments)};
+    window.logout=async function(){
+      if(refreshTimer)clearTimeout(refreshTimer);
+      if(fallbackTimer)clearInterval(fallbackTimer);
+      if(reconnectTimer)clearTimeout(reconnectTimer);
+      if(realtimeChannel){try{await sb.removeChannel(realtimeChannel)}catch(e){}realtimeChannel=null}
+      return originalLogout.apply(this,arguments);
+    };
   }
   window.sunshineRestartRealtime=startRealtime;
 })();
-
 </script>
 </body></html>

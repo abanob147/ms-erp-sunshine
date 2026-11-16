@@ -364,15 +364,40 @@ async function saveInvoice(){
       $('cancelSaleEditBtn').classList.add('hidden');
       msg('salesmsg','تم تعديل الفاتورة وتحديث المخزون وكشف حساب العميل بنجاح.',true);
     }else{
-      ({data,error}=await sb.rpc('save_sale_and_deduct_stock',{
-        p_invoice_number:invoiceNo,p_customer_id:customerId,
-        p_invoice_date:$('invDate').value||new Date().toISOString().slice(0,10),
-        p_total_amount:total,p_paid_amount:paid,p_currency:$('invCurrency').value,
-        p_discount_amount:0,p_exchange_rate:1,p_items:lines,p_request_id:pendingSaleRequestId
-      }));
-      if(error)throw error;
+      // Refresh the invoice number immediately before saving. The number shown
+      // when the page was opened may have become stale if another account saved.
+      let attempt=0, saved=false, lastError=null;
+      while(attempt<3&&!saved){
+        attempt++;
+        if(attempt>1 || !invoiceNo){
+          const fresh=await sb.rpc('next_sales_invoice_number');
+          if(fresh.error)throw fresh.error;
+          invoiceNo=String(fresh.data||'').trim();
+          if(!invoiceNo)throw new Error('تعذر الحصول على رقم فاتورة جديد من قاعدة البيانات');
+          $('invNo').value=invoiceNo;
+        } else {
+          // Always ask the database for the latest number, not the value cached on page load.
+          const fresh=await sb.rpc('next_sales_invoice_number');
+          if(fresh.error)throw fresh.error;
+          invoiceNo=String(fresh.data||'').trim();
+          if(!invoiceNo)throw new Error('تعذر الحصول على رقم فاتورة جديد من قاعدة البيانات');
+          $('invNo').value=invoiceNo;
+        }
+        ({data,error}=await sb.rpc('save_sale_and_deduct_stock',{
+          p_invoice_number:invoiceNo,p_customer_id:customerId,
+          p_invoice_date:$('invDate').value||new Date().toISOString().slice(0,10),
+          p_total_amount:total,p_paid_amount:paid,p_currency:$('invCurrency').value,
+          p_discount_amount:0,p_exchange_rate:1,p_items:lines,p_request_id:pendingSaleRequestId
+        }));
+        if(!error){saved=true;break;}
+        lastError=error;
+        const duplicate=String(error.message||'').includes('sales_invoice_number_key')||String(error.code||'')==='23505';
+        if(!duplicate)throw error;
+        msg('salesmsg','رقم الفاتورة مستخدم بالفعل؛ جارٍ طلب رقم جديد والمحاولة مرة أخرى...',true);
+      }
+      if(!saved)throw lastError||new Error('تعذر حفظ الفاتورة بعد إعادة المحاولة');
       pendingSaleRequestId=null;
-      msg('salesmsg','تم حفظ الفاتورة بنجاح وخصم المخزون. رقم السجل: '+data,true);
+      msg('salesmsg','تم حفظ الفاتورة بنجاح وخصم المخزون. رقم الفاتورة: '+invoiceNo,true);
     }
     await loadItems();await loadSalesArchive();
     $('invPaid').value='0';if($('invNotes'))$('invNotes').value='';$('invoiceRows').innerHTML='';addInvoiceRow();
@@ -1541,6 +1566,33 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
     };
   }
   window.sunshineRestartRealtime=startRealtime;
+})();
+</script>
+<script>
+/* Sunshine ERP: dedicated live archive refresh */
+(function(){
+  let timer = null;
+  let busy = false;
+  async function refreshArchive(){
+    const app = document.getElementById('application');
+    const archive = document.getElementById('salesArchive');
+    const title = document.getElementById('pageTitle');
+    if (document.hidden || !window.sb || !window.role || !app || app.classList.contains('hidden')) return;
+    if (!title || title.textContent.trim() !== 'المبيعات' || !archive || archive.classList.contains('hidden')) return;
+    if (busy || typeof window.loadSalesArchive !== 'function') return;
+    busy = true;
+    try { await window.loadSalesArchive(); }
+    catch (error) { console.warn('Archive refresh failed:', error); }
+    finally { busy = false; }
+  }
+  function start(){
+    if (timer) clearInterval(timer);
+    timer = setInterval(refreshArchive, 3000);
+  }
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) refreshArchive(); });
+  window.addEventListener('online', refreshArchive);
+  start();
+  window.sunshineRefreshInvoiceArchive = refreshArchive;
 })();
 </script>
 </body></html>

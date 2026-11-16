@@ -706,23 +706,6 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
         <div><label>من تاريخ</label><input id="statementFrom" type="date"></div><div><label>إلى تاريخ</label><input id="statementTo" type="date"></div></div>
         <div class="finance-actions"><button type="button" onclick="loadCustomerStatement()">عرض كشف الحساب</button><button type="button" class="secondary" onclick="printCustomerStatement()">طباعة / حفظ PDF</button><button type="button" style="background:#168b55" onclick="sendCustomerStatementWhatsApp()">إرسال ملخص عبر واتساب</button></div>
         <p id="statementMsg" class="msg"></p><div id="customerStatementPrint" class="hidden"><div class="invoice-head"><div><h2>صن شاين للاستيراد والتصدير</h2><b>كشف حساب عميل</b></div><div id="statementPrintMeta"></div></div><div id="statementSummary" class="finance-stats"></div><div class="finance-table"><table><thead><tr><th>التاريخ</th><th>البيان</th><th>رقم الفاتورة</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead><tbody id="statementRows"></tbody></table></div><p id="statementPrintFooter" class="muted"></p></div>
-      </div>
-      <div class="finance-section"><h3>إدارة الشيكات</h3><p class="muted">سجّل بيانات الشيك وارفق صورته وحدد موعد التحصيل. يظهر تنبيه للمدير والموظف قبل موعد التحصيل بيومين ويستمر في يوم الاستحقاق وبعده حتى تحديث الحالة إلى محصّل.</p>
-        <div class="finance-form">
-          <div><label>رقم الشيك</label><input id="checkNumber" placeholder="رقم الشيك"></div>
-          <div><label>اسم البنك</label><input id="checkBank" placeholder="اسم البنك"></div>
-          <div><label>اسم صاحب الشيك / الساحب</label><input id="checkDrawer" placeholder="اسم صاحب الشيك"></div>
-        <div><label>العميل صاحب الشيك</label><select id="checkCustomer"><option value="">اختر العميل</option>${financeCustomers.map(c=>`<option value="${safe(c.id)}">${safe(c.name)}</option>`).join('')}</select></div>
-          <div><label>قيمة الشيك بالجنيه المصري</label><input id="checkAmount" type="number" min="0.01" step="0.01"></div>
-          <div><label>تاريخ إصدار الشيك</label><input id="checkIssueDate" type="date" value="${today()}"></div>
-          <div><label>موعد التحصيل</label><input id="checkCollectionDate" type="date"></div>
-          <div><label>حالة الشيك</label><select id="checkStatus"><option value="pending">لم يتم التحصيل</option><option value="collected">تم التحصيل</option></select></div>
-          <div><label>صورة الشيك</label><input id="checkImage" type="file" accept="image/*"><small class="muted">صورة واضحة، بحد أقصى 2 ميجابايت.</small></div>
-          <div style="grid-column:1/-1"><label>بيانات / ملاحظات الشيك</label><textarea id="checkNotes" rows="2" style="width:100%;padding:10px;border:1px solid #d9d5df;border-radius:8px"></textarea></div>
-        </div>
-        <div class="finance-actions"><button type="button" onclick="saveCompanyCheck()">حفظ الشيك</button><button type="button" class="secondary" onclick="resetCheckForm()">إلغاء / تفريغ</button></div><p id="checkMsg" class="msg"></p>
-        <div id="checkAlertsBox" class="finance-note hidden" role="status"></div>
-        <div class="finance-table"><table><thead><tr><th>رقم الشيك</th><th>البنك</th><th>الساحب</th><th>العميل صاحب الشيك</th><th>القيمة</th><th>تاريخ الإصدار</th><th>موعد التحصيل</th><th>الحالة</th><th>الصورة</th><th>الإجراءات</th></tr></thead><tbody id="checkRows">${checkTableRows()}</tbody></table></div>
       </div>`;
   }
 

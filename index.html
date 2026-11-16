@@ -67,7 +67,7 @@ async function addItem(){
  if(role==='admin')result=await sb.rpc('admin_save_item',{p_item:row,p_item_id:editingItemId});
  else result=await sb.from('items').insert(row);
  if(result.error){msg('itemmsg',(editingItemId!==null?'لم يتم تعديل الصنف: ':'لم يتم حفظ الصنف: ')+result.error.message,false);return}
- if(role==='admin'&&editingItemId!==null){const pricingUpdate=await sb.from('items').update({awaiting_manager_pricing:false}).eq('id',editingItemId);if(pricingUpdate.error){msg('itemmsg','تم حفظ الأسعار لكن تعذر تحديث حالة انتظار التسعير: '+pricingUpdate.error.message,false);return}}
+ // يتم حفظ awaiting_manager_pricing=false ضمن بيانات الصنف نفسها عبر RPC admin_save_item؛ لا ننفذ UPDATE مباشرًا على جدول items حتى لا نصطدم بصلاحيات الجدول.
  msg('itemmsg',role==='employee'?'تم تسجيل الصنف. يظهر باللون الأخضر «ينتظر التسعير» حتى يحدد المدير سعري الشراء والبيع.':(editingItemId!==null?'تم تعديل بيانات الصنف بنجاح':'تم حفظ الصنف بنجاح'),true);cancelItemEdit();await loadItems();
 }
 function editItem(id){if(role!=='admin'){alert('تعديل الأصناف متاح للمدير فقط');return}const x=itemsCache.find(v=>String(v.id)===String(id));if(!x)return;editingItemId=x.id;$('iname').value=x.name||'';$('isku').value=x.sku||'';$('icode').value=x.item_code||'';$('iunit').value=x.unit||'';$('ipurchase').value=Number(x.purchase_price||0);$('isale').value=Number(x.sale_price||0);$('iqty').value=itemCurrentStock(x);$('itemSaveBtn').textContent='حفظ التعديلات';$('itemCancelBtn').classList.remove('hidden');$('itemmsg').textContent='تعديل الصنف: '+x.name;window.scrollTo({top:$('items').getBoundingClientRect().top+window.scrollY-20,behavior:'smooth'});}

@@ -58,8 +58,8 @@ function openPage(id,btn){if(id==='shipments'&&role!=='admin'){alert('غير م�
 function msg(id,t,ok){$(id).textContent=t;$(id).className='msg '+(ok?'ok':'error')}
 async function addItem(){
  const row={name:$('iname').value.trim(),sku:$('isku').value.trim()||null,item_code:$('icode').value.trim()||null,unit:$('iunit').value.trim()||null,opening_quantity:Number($('iqty').value||0),current_quantity:Number($('iqty').value||0)};
- if(role==='admin'){row.sale_price=Number($('isale').value||0);row.purchase_price=Number($('ipurchase').value||0)}
- else {row.sale_price=0;row.purchase_price=0;if(editingItemId!==null){msg('itemmsg','الموظف يمكنه إضافة صنف جديد فقط؛ تعديل الأصناف والتسعير متاح للمدير.',false);return}}
+ if(role==='admin'){row.sale_price=Number($('isale').value||0);row.purchase_price=Number($('ipurchase').value||0);row.awaiting_manager_pricing=false}
+ else {row.sale_price=0;row.purchase_price=0;row.awaiting_manager_pricing=true;if(editingItemId!==null){msg('itemmsg','الموظف يمكنه إضافة صنف جديد فقط؛ تعديل الأصناف والتسعير متاح للمدير.',false);return}}
  if(!row.name){msg('itemmsg','اكتب اسم الصنف',false);return}
  if(Object.values(row).some(v=>typeof v==='number'&&(!Number.isFinite(v)||v<0))){msg('itemmsg','راجع الأسعار والرصيد، يجب ألا تكون سالبة',false);return}
  if(role==='admin'&&((row.sale_price>0&&row.purchase_price<=0)||(row.purchase_price>0&&row.sale_price<=0))){msg('itemmsg','أدخل سعر الشراء وسعر البيع معًا، أو اتركهما صفرًا لحين التسعير.',false);return}
@@ -67,6 +67,7 @@ async function addItem(){
  if(role==='admin')result=await sb.rpc('admin_save_item',{p_item:row,p_item_id:editingItemId});
  else result=await sb.from('items').insert(row);
  if(result.error){msg('itemmsg',(editingItemId!==null?'لم يتم تعديل الصنف: ':'لم يتم حفظ الصنف: ')+result.error.message,false);return}
+ if(role==='admin'&&editingItemId!==null){const pricingUpdate=await sb.from('items').update({awaiting_manager_pricing:false}).eq('id',editingItemId);if(pricingUpdate.error){msg('itemmsg','تم حفظ الأسعار لكن تعذر تحديث حالة انتظار التسعير: '+pricingUpdate.error.message,false);return}}
  msg('itemmsg',role==='employee'?'تم تسجيل الصنف. يظهر باللون الأخضر «ينتظر التسعير» حتى يحدد المدير سعري الشراء والبيع.':(editingItemId!==null?'تم تعديل بيانات الصنف بنجاح':'تم حفظ الصنف بنجاح'),true);cancelItemEdit();await loadItems();
 }
 function editItem(id){if(role!=='admin'){alert('تعديل الأصناف متاح للمدير فقط');return}const x=itemsCache.find(v=>String(v.id)===String(id));if(!x)return;editingItemId=x.id;$('iname').value=x.name||'';$('isku').value=x.sku||'';$('icode').value=x.item_code||'';$('iunit').value=x.unit||'';$('ipurchase').value=Number(x.purchase_price||0);$('isale').value=Number(x.sale_price||0);$('iqty').value=Number(x.opening_quantity||0);$('itemSaveBtn').textContent='حفظ التعديلات';$('itemCancelBtn').classList.remove('hidden');$('itemmsg').textContent='تعديل الصنف: '+x.name;window.scrollTo({top:$('items').getBoundingClientRect().top+window.scrollY-20,behavior:'smooth'});}
@@ -76,11 +77,11 @@ function itemHasApprovedPrices(x){return Number(x?.purchase_price)>0&&Number(x?.
 async function loadItems(){
  if(!sb)return;
  // سعر الشراء يُستخدم داخليًا للتحقق من حد سعر البيع؛ لا يُعرض للموظف في الشاشة.
- const result=role==='admin'?await sb.rpc('admin_list_items_with_cost'):await sb.from('items').select('id,sku,item_code,name,unit,sale_price,purchase_price,opening_quantity').order('name');
+ const result=role==='admin'?await sb.rpc('admin_list_items_with_cost'):await sb.from('items').select('id,sku,item_code,name,unit,sale_price,purchase_price,opening_quantity,awaiting_manager_pricing').order('name');
  const {data,error}=result;
  if(error){$('itemrows').innerHTML='<tr><td colspan="8">'+esc(error.message)+'</td></tr>';itemsCache=[];refreshInvoiceItemLists();return}
  itemsCache=data||[];
- $('itemrows').innerHTML=itemsCache.map(x=>{const priced=itemHasApprovedPrices(x);return `<tr><td>${esc(x.sku)}</td><td>${esc(x.item_code)}</td><td>${esc(x.name)} ${priced?'':'<span class="pending-price">ينتظر التسعير</span>'}</td><td>${esc(x.unit)}</td>${role==='admin'?`<td>${Number(x.purchase_price||0).toLocaleString()}</td>`:''}<td>${priced?Number(x.sale_price||0).toLocaleString():'—'}</td><td>${Number(x.opening_quantity||0).toLocaleString()}</td>${role==='admin'?`<td><button type="button" class="secondary" onclick="editItem('${String(x.id)}')">تعديل / تسعير</button> <button type="button" style="background:#a11" onclick="deleteItem('${String(x.id)}')">حذف</button></td>`:''}</tr>`}).join('');
+ $('itemrows').innerHTML=itemsCache.map(x=>{const priced=itemHasApprovedPrices(x),pending=x.awaiting_manager_pricing===true;return `<tr><td>${esc(x.sku)}</td><td>${esc(x.item_code)}</td><td>${esc(x.name)} ${pending?'<span class="pending-price">ينتظر التسعير</span>':''}</td><td>${esc(x.unit)}</td>${role==='admin'?`<td>${Number(x.purchase_price||0).toLocaleString()}</td>`:''}<td>${priced?Number(x.sale_price||0).toLocaleString():'—'}</td><td>${Number(x.opening_quantity||0).toLocaleString()}</td>${role==='admin'?`<td><button type="button" class="secondary" onclick="editItem('${String(x.id)}')">تعديل / تسعير</button> <button type="button" style="background:#a11" onclick="deleteItem('${String(x.id)}')">حذف</button></td>`:''}</tr>`}).join('');
  refreshInvoiceItemLists();
 }
 function printInventorySummary(){

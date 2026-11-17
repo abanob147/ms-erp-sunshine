@@ -1590,6 +1590,16 @@ function printInvoiceDocument(){
   const w=window.open('','_blank','width=980,height=760');
   if(!w){alert('اسمح بفتح النوافذ المنبثقة لطباعة الفاتورة ثم أعد المحاولة.');return;}
   const clone=source.cloneNode(true);
+  // Preserve live form state: cloneNode does not copy input values or selected options.
+  const liveControls=source.querySelectorAll('input,select,textarea');
+  const printControls=clone.querySelectorAll('input,select,textarea');
+  liveControls.forEach((live,i)=>{
+    const copy=printControls[i]; if(!copy)return;
+    if(live.tagName==='SELECT'){ copy.selectedIndex=live.selectedIndex; Array.from(copy.options).forEach((opt,j)=>{opt.selected=j===live.selectedIndex;}); }
+    else if(live.type==='checkbox'||live.type==='radio'){copy.checked=live.checked;}
+    else {copy.value=live.value; copy.setAttribute('value',live.value||'');}
+    if(live.tagName==='TEXTAREA')copy.textContent=live.value;
+  });
   clone.querySelectorAll('.no-print,button').forEach(el=>el.remove());
   clone.querySelectorAll('input,select,textarea').forEach(el=>{
     const span=document.createElement('span');
@@ -1606,16 +1616,20 @@ function printInvoiceDocument(){
     el.replaceWith(span);
   });
   const styles=`
-    @page{size:A4;margin:10mm}
+    @page{size:A4 portrait;margin:12mm}
     *{box-sizing:border-box}
-    html,body{margin:0;padding:0;background:#fff;color:#111;font-family:Arial,Tahoma,sans-serif;direction:rtl}
-    #invoicePrint{display:block!important;width:100%;margin:0!important;padding:0!important;background:#fff!important;color:#111!important;font-size:12px;line-height:1.55}
+    html,body{margin:0!important;padding:0!important;background:#fff!important;color:#111;font-family:Arial,Tahoma,sans-serif;direction:rtl;width:100%}
+    body{font-size:12px;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    #invoicePrint{display:block!important;width:100%!important;max-width:186mm!important;min-height:273mm;margin:0 auto!important;padding:0!important;background:#fff!important;color:#111!important;font-size:12px;line-height:1.55;box-shadow:none!important;border:0!important}
     .invoice-head{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:2px solid #a90d58;padding:0 0 9px;margin:0 0 12px;break-inside:avoid}
     .invoice-brand{display:flex;align-items:center;gap:10px;min-width:0}
     .invoice-logo{width:92px!important;height:62px!important;max-width:92px!important;flex:0 0 92px!important;object-fit:contain!important}
     .invoice-brand h2,.invoice-head h2{font-size:19px;margin:0 0 4px;color:#8f124f}
     .invoice-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:0 0 10px}
     .invoice-fields>div,.invoice-fields label{min-width:0}
+    .invoice-fields>div{break-inside:avoid}
+    #invoicePrint .invoice-brand{gap:10px}
+    #invoicePrint .invoice-head{break-inside:avoid}
     .print-field-value{display:inline-block;min-height:18px;white-space:pre-wrap;overflow-wrap:anywhere;font-weight:600}
     #invoicePrint table{width:100%!important;min-width:0!important;border-collapse:collapse!important;margin:8px 0;font-size:11px}
     #invoicePrint td:first-child{min-width:0!important;width:38%;white-space:normal!important;overflow-wrap:anywhere!important}
@@ -1628,8 +1642,10 @@ function printInvoiceDocument(){
     .invoice-notes label{font-weight:800}
     #invoicePrint img{max-width:100%;object-fit:contain}
     #invoicePrint .scroll{overflow:visible!important}
+    #invoicePrint tr{break-inside:avoid}
+    #invoicePrint .invoice-total,#invoicePrint .invoice-notes{break-inside:avoid}
     .print-field-value{border:0!important;text-decoration:none!important;padding:1px 3px;background:transparent!important;box-shadow:none!important}
-    @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+    @media print{html,body{width:100%!important;height:auto!important}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}#invoicePrint{width:100%!important;max-width:none!important;margin:0!important}}
   `;
   w.document.open();
   w.document.write('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>فاتورة صن شاين</title><style>'+styles+'</style></head><body>'+clone.outerHTML+'</body></html>');

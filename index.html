@@ -713,6 +713,11 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
         <div class="finance-form"><div><label>اختر الحساب البنكي</label><select id="bankStatementAccount"><option value="">-- اختر البنك --</option>${financeBanks.map(b=>`<option value="${safe(b.id)}">${safe(b.bank_name)} — ${safe(b.account_name||'')}</option>`).join('')}</select></div><div><label>من تاريخ</label><input id="bankStatementFrom" type="date"></div><div><label>إلى تاريخ</label><input id="bankStatementTo" type="date"></div></div>
         <div class="finance-actions"><button type="button" onclick="loadBankStatement()">عرض كشف الحساب</button><button type="button" class="secondary" onclick="printBankStatement()">طباعة / حفظ PDF</button></div><p id="bankStatementMsg" class="msg"></p><div id="bankStatementResult"></div></div>
       <div class="finance-section"><h3>سجل الحركات المالية</h3><div class="finance-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الحساب</th><th>المبلغ</th><th>العميل</th><th>البيان</th></tr></thead><tbody>${txRows}</tbody></table></div></div>
+      <div class="finance-section"><h3>كشف حساب مجمع للعملاء</h3><p class="muted">يعرض جميع العملاء الذين لديهم مديونية قائمة، مع رقم الهاتف وإجمالي المبلغ المدين به كل عميل. الرصيد محسوب من إجمالي المدين ناقص إجمالي الدائن في كشف حساب العملاء.</p>
+        <div class="finance-actions"><button type="button" onclick="loadAggregateCustomerDebts()">عرض / تحديث الكشف المجمع</button><button type="button" class="secondary" onclick="printAggregateCustomerDebts()">طباعة / حفظ PDF</button></div>
+        <p id="aggregateDebtMsg" class="msg" aria-live="polite"></p><div id="aggregateDebtSummary" class="finance-stats"></div>
+        <div class="finance-table"><table><thead><tr><th>اسم العميل</th><th>رقم الهاتف</th><th>المبلغ المدين به</th></tr></thead><tbody id="aggregateDebtRows"><tr><td colspan="3">اضغط «عرض / تحديث الكشف المجمع» لعرض مديونيات العملاء.</td></tr></tbody></table></div>
+      </div>
       <div class="finance-section"><h3>كشف حساب عميل</h3><p class="muted">الكشف يعتمد على الحركات المحفوظة في جدول customer_transactions، مع رصيد متحرك ورصيد سابق للفترة.</p>
         <div class="finance-form"><div><label>اختر العميل</label><select id="statementCustomer"><option value="">-- اختر العميل --</option>${custOpts}</select></div>
         <div><label>من تاريخ</label><input id="statementFrom" type="date"></div><div><label>إلى تاريخ</label><input id="statementTo" type="date"></div></div>
@@ -720,6 +725,46 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
         <p id="statementMsg" class="msg"></p><div id="customerStatementPrint" class="hidden"><div class="invoice-head"><div><h2>صن شاين للاستيراد والتصدير</h2><b>كشف حساب عميل</b></div><div id="statementPrintMeta"></div></div><div id="statementSummary" class="finance-stats"></div><div class="finance-table"><table><thead><tr><th>التاريخ</th><th>البيان</th><th>رقم الفاتورة</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead><tbody id="statementRows"></tbody></table></div><p id="statementPrintFooter" class="muted"></p></div>
       </div>`;
   }
+
+  let aggregateCustomerDebtRows=[];
+  window.loadAggregateCustomerDebts=async function(){
+    const msg=el('aggregateDebtMsg'),host=el('aggregateDebtRows'),summary=el('aggregateDebtSummary');
+    if(!host||!window.sb)return;
+    if(msg){msg.textContent='جارٍ تجميع مديونيات العملاء...';msg.className='msg'}
+    host.innerHTML='<tr><td colspan="3">جارٍ تحميل البيانات...</td></tr>';
+    try{
+      const balances=new Map();let start=0;const pageSize=1000;
+      while(true){
+        const {data,error}=await sb.from('customer_transactions')
+          .select('customer_id,debit,credit').order('id',{ascending:true})
+          .range(start,start+pageSize-1);
+        if(error)throw error;
+        const batch=data||[];
+        for(const row of batch){
+          const key=String(row.customer_id);
+          const current=balances.get(key)||0;
+          balances.set(key,current+Number(row.debit||0)-Number(row.credit||0));
+        }
+        if(batch.length<pageSize)break;
+        start+=pageSize;
+      }
+      aggregateCustomerDebtRows=financeCustomers.map(c=>({
+        id:c.id,name:c.name||'—',phone:c.phone||'—',balance:Math.max(0,Number(balances.get(String(c.id))||0))
+      })).filter(c=>c.balance>0.005).sort((a,b)=>b.balance-a.balance);
+      const total=aggregateCustomerDebtRows.reduce((sum,c)=>sum+c.balance,0);
+      host.innerHTML=aggregateCustomerDebtRows.map(c=>`<tr><td>${safe(c.name)}</td><td dir="ltr">${safe(c.phone)}</td><td><b>${money(c.balance)}</b></td></tr>`).join('')||'<tr><td colspan="3">لا توجد مديونيات قائمة على العملاء.</td></tr>';
+      if(summary)summary.innerHTML=`<div class="finance-stat"><b>إجمالي مديونيات العملاء</b><strong>${money(total)}</strong></div><div class="finance-stat"><b>عدد العملاء المدينين</b><strong>${aggregateCustomerDebtRows.length}</strong></div>`;
+      if(msg){msg.textContent='تم تحديث الكشف المجمع بنجاح.';msg.className='msg ok'}
+    }catch(e){host.innerHTML='<tr><td colspan="3">تعذر تحميل الكشف المجمع: '+safe(e.message)+'</td></tr>';if(msg){msg.textContent='تعذر تحميل الكشف المجمع: '+e.message;msg.className='msg error'}}
+  };
+  window.printAggregateCustomerDebts=function(){
+    if(!aggregateCustomerDebtRows.length){alert('اعرض الكشف المجمع أولاً.');return}
+    const total=aggregateCustomerDebtRows.reduce((sum,c)=>sum+c.balance,0);
+    const rows=aggregateCustomerDebtRows.map(c=>`<tr><td>${safe(c.name)}</td><td dir="ltr">${safe(c.phone)}</td><td>${money(c.balance)}</td></tr>`).join('');
+    const w=window.open('','_blank','width=1000,height=750');if(!w){alert('اسمح بفتح النوافذ المنبثقة للطباعة.');return}
+    w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>كشف حساب مجمع للعملاء</title><style>body{font-family:Arial,Tahoma,sans-serif;padding:24px;color:#111}h2,h3{text-align:center}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #777;padding:10px;text-align:center}th{background:#eee}.total{font-size:20px;font-weight:bold;margin-top:18px}</style></head><body><h2>صن شاين للاستيراد والتصدير</h2><h3>كشف حساب مجمع بمديونيات العملاء</h3><p>تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG',{timeZone:'Africa/Cairo'})}</p><table><thead><tr><th>اسم العميل</th><th>رقم الهاتف</th><th>المبلغ المدين به</th></tr></thead><tbody>${rows}</tbody></table><div class="total">إجمالي مديونيات العملاء: ${money(total)} | عدد العملاء: ${aggregateCustomerDebtRows.length}</div><script>window.onload=()=>window.print()<\/script></body></html>`);
+    w.document.close();
+  };
 
   let currentCustomerStatement=null;
   window.loadCustomerStatement=async function(){

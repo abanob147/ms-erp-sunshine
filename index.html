@@ -1600,7 +1600,8 @@ function printInvoiceDocument(){
     else {copy.value=live.value; copy.setAttribute('value',live.value||'');}
     if(live.tagName==='TEXTAREA')copy.textContent=live.value;
   });
-  clone.querySelectorAll('.no-print,button').forEach(el=>el.remove());
+  // لا نطبع حقل البيان اليدوي المخفي ولا نصه الإرشادي داخل الفاتورة.
+  clone.querySelectorAll('.no-print,button,.manual-product,.invoice-notes').forEach(el=>el.remove());
   clone.querySelectorAll('input,select,textarea').forEach(el=>{
     const span=document.createElement('span');
     span.className='print-field-value';

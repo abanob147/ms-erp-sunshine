@@ -1675,12 +1675,14 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
   if(!confirm('سيتم تسجيل المصروف التشغيلي وخصم '+money(amount)+' جنيه تلقائياً من الخزينة النقدية.\\n'+expenseText+'\\nالرصيد المتبقي بالخزينة: '+money(cashBalance-amount)+' جنيه. هل تريد المتابعة؟'))return;
   $('expenseMsg').textContent='جارٍ حفظ المصروف وخصمه من الخزينة...';
   const {data:{user}}=await sb.auth.getUser();
-  const {data:expenseRow,error:expenseError}=await sb.from('operating_expenses').insert({expense_date,category,description,amount,created_by:user?.id||null}).select('id').single();
-  if(expenseError){$('expenseMsg').textContent='تعذر حفظ المصروف: '+expenseError.message;return}
+  // لا نطلب SELECT بعد INSERT؛ بعض سياسات RLS تسمح بالإضافة ولا تسمح بإرجاع السجل.
+  const {error:expenseError}=await sb.from('operating_expenses').insert({expense_date,category,description,amount,created_by:user?.id||null});
+  if(expenseError){$('expenseMsg').textContent='تعذر حفظ المصروف التشغيلي: '+expenseError.message;return}
   const {error:cashError}=await sb.from('account_transactions').insert({kind:'payment',account_type:'cash',account_id:null,target_account_type:null,target_account_id:null,amount,customer_id:null,transaction_date:expense_date,description:expenseText,created_by:user?.id||null});
   if(cashError){
-    const {error:rollbackError}=await sb.from('operating_expenses').delete().eq('id',expenseRow.id);
-    $('expenseMsg').textContent='تعذر خصم المصروف من الخزينة: '+cashError.message+(rollbackError?' — وتعذر التراجع التلقائي عن سجل المصروف، يرجى مراجعة المدير.':' — لم يتم اعتماد المصروف.');
+    // تراجع عن سجل المصروف المطابق إذا تعذر إنشاء سند الصرف.
+    const rollback=await sb.from('operating_expenses').delete().eq('expense_date',expense_date).eq('category',category).eq('amount',amount).eq('created_by',user?.id||null);
+    $('expenseMsg').textContent='تم رفض خصم الخزينة: '+cashError.message+(rollback.error?' — تعذر التراجع التلقائي عن سجل المصروف؛ راجع المدير قبل إعادة المحاولة.':' — تم التراجع عن سجل المصروف ولم يُعتمد.');
     return;
   }
   $('expenseAmount').value='';$('expenseCategory').value='';$('expenseDescription').value='';

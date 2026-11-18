@@ -401,7 +401,7 @@ async function loadInvoiceCompanyContact(){
  host.textContent=parts.join(' | ');
 }
 async function logout(){await sb.auth.signOut();location.reload()}
-function openPage(id,btn){if(currentSalesRep&&!['dashboard','items','warehouses','sales','customers','rep-collections'].includes(id)){alert('هذا القسم غير متاح لحساب المندوب.');return}if((id==='shipments'||id==='sales-reps')&&role!=='admin'){alert('هذه الصفحة متاحة للمدير فقط');return}document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');['dashboard','items','warehouses','shipments','sales','customers','sales-reps','rep-collections','placeholder'].forEach(x=>$(x).classList.add('hidden'));$('pageTitle').textContent=btn?btn.textContent.trim():id;if(['dashboard','items','warehouses','shipments','sales','customers','sales-reps'].includes(id))$(id).classList.remove('hidden');else{$('placeholder').classList.remove('hidden');$('placeholderTitle').textContent=btn?btn.textContent.trim():id}if(id==='sales-reps'){loadSalesReps()}if(id==='warehouses'){if($('transferDate')&&!$('transferDate').value)$('transferDate').value=new Date().toISOString().slice(0,10);loadWarehouses().then(loadWarehouseLedger)}if(id==='items')loadWarehouses();if(id==='shipments')loadUsdEgpRate();if(id==='dashboard'&&role==='admin'&&window.loadAdminProfitDashboard)window.loadAdminProfitDashboard();if(id==='sales'){loadItems();loadCustomers();if(!$('invoiceRows').children.length)addInvoiceRow()}}
+function openPage(id,btn){if(currentSalesRep&&!['dashboard','items','warehouses','sales','customers','rep-collections'].includes(id)){alert('هذا القسم غير متاح لحساب المندوب.');return}if((id==='shipments'||id==='sales-reps')&&role!=='admin'){alert('هذه الصفحة متاحة للمدير فقط');return}document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');['dashboard','items','warehouses','shipments','sales','returns','customers','sales-reps','rep-collections','placeholder'].forEach(x=>$(x)?.classList.add('hidden'));$('pageTitle').textContent=btn?btn.textContent.trim():id;if(['dashboard','items','warehouses','shipments','sales','returns','customers','sales-reps'].includes(id))$(id)?.classList.remove('hidden');else{$('placeholder').classList.remove('hidden');$('placeholderTitle').textContent=btn?btn.textContent.trim():id}if(id==='sales-reps'){loadSalesReps()}if(id==='warehouses'){if($('transferDate')&&!$('transferDate').value)$('transferDate').value=new Date().toISOString().slice(0,10);loadWarehouses().then(loadWarehouseLedger)}if(id==='items')loadWarehouses();if(id==='shipments')loadUsdEgpRate();if(id==='dashboard'&&role==='admin'&&window.loadAdminProfitDashboard)window.loadAdminProfitDashboard();if(id==='sales'){loadItems();loadCustomers();if(!$('invoiceRows').children.length)addInvoiceRow()}if(id==='returns'){returnLoadSales();returnLoadRequests()}}
 function msg(id,t,ok){$(id).textContent=t;$(id).className='msg '+(ok?'ok':'error')}
 async function loadWarehouses(){if(!sb)return;const {data,error}=await sb.from('warehouses').select('id,name,is_active').order('id');if(error){warehousesCache=[];const m=$('warehouseMsg');if(m)m.textContent='تعذر تحميل المخازن: '+error.message+' — نفّذ ملف إعداد قاعدة البيانات المحدث.';return}warehousesCache=data||[];const active=warehousesCache.filter(w=>w.is_active!==false);const opts='<option value="">اختر المخزن</option>'+active.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join('');['iwarehouse','warehouseFilter','transferFrom','transferTo'].forEach(id=>{const el=$(id);if(el){const old=el.value;el.innerHTML=opts;if(old&&active.some(w=>String(w.id)===String(old)))el.value=old}});const ti=$('transferItem');if(ti)ti.innerHTML='<option value="">اختر الصنف</option>'+itemsCache.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');renderWarehouseAdminList()}
 function warehouseName(id){return warehousesCache.find(w=>String(w.id)===String(id))?.name||''}
@@ -2044,7 +2044,7 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
     'items','customers','sales','sale_items','customer_transactions',
     'account_transactions','bank_accounts','company_checks','company_settings',
     'import_shipments','purchases','purchase_items','supplier_ledger',
-    'suppliers','operating_expenses','accounts','sales_reps','sales_rep_collection_receipts'
+    'suppliers','operating_expenses','accounts','sale_return_requests','sales_reps','sales_rep_collection_receipts'
   ];
   const $rt=id=>document.getElementById(id);
   function realtimeStatus(text,ok){
@@ -2054,7 +2054,7 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
   }
   function currentPage(){
     const title=$rt('pageTitle')?.textContent?.trim()||'';
-    const map={'لوحة التحكم':'dashboard','الأصناف والمخزون':'items','شحنات الاستيراد':'shipments','المبيعات':'sales','العملاء':'customers','المشتريات':'purchases','الموردون':'suppliers','شؤون الموظفين':'hr','الحسابات والخزينة':'accounts','الشيكات':'checks','التقارير':'reports','إعدادات المدير':'settings','أرقام الحسابات':'bank-directory','تحصيلات المندوبين':'rep-collections'};
+    const map={'لوحة التحكم':'dashboard','الأصناف والمخزون':'items','شحنات الاستيراد':'shipments','المبيعات':'sales','العملاء':'customers','المشتريات':'purchases','الموردون':'suppliers','شؤون الموظفين':'hr','الحسابات والخزينة':'accounts','الشيكات':'checks','التقارير':'reports','مرتجعات المبيعات':'returns','إعدادات المدير':'settings','أرقام الحسابات':'bank-directory','تحصيلات المندوبين':'rep-collections'};
     return map[title]||'dashboard';
   }
   function userIsEditing(){
@@ -2105,6 +2105,8 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
         if(window.loadSuppliers)await window.loadSuppliers();
       }else if(page==='hr'){
         if(role==='admin'&&window.sunshineHrLoad)await window.sunshineHrLoad();
+      }else if(page==='returns'){
+        await window.returnLoadRequests?.();
       }else if(page==='rep-collections'){
         await window.loadRepCollections?.();
       }else if(page==='bank-directory'){

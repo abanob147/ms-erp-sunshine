@@ -2078,7 +2078,7 @@ function printInvoiceDocument(printWindow=null){
     if(live.tagName==='TEXTAREA')copy.textContent=live.value;
   });
   // لا نطبع حقل البيان اليدوي المخفي ولا نصه الإرشادي داخل الفاتورة.
-  clone.querySelectorAll('.no-print,button,.manual-product,.invoice-notes').forEach(el=>el.remove());
+  clone.querySelectorAll('.no-print,button,.manual-product').forEach(el=>el.remove());
   clone.querySelectorAll('input,select,textarea').forEach(el=>{
     const span=document.createElement('span');
     span.className='print-field-value';
@@ -2116,8 +2116,9 @@ function printInvoiceDocument(printWindow=null){
     #invoicePrint th{background:#f8e8f0!important;font-weight:800}
     .invoice-total{max-width:300px;margin:10px 0 0 auto}
     .invoice-total>div{display:flex;justify-content:space-between;padding:5px;border-bottom:1px solid #bbb}
-    .invoice-notes{margin-top:10px;padding:8px;border:1px solid #777}
-    .invoice-notes label{font-weight:800}
+    .invoice-notes{display:block!important;margin-top:10px;padding:8px;border:1px solid #777;white-space:pre-wrap;break-inside:avoid}
+    .invoice-notes label{display:block;font-weight:800;margin-bottom:4px}
+    .invoice-notes .print-field-value{display:block;min-height:18px;white-space:pre-wrap;overflow-wrap:anywhere}
     #invoicePrint img{max-width:100%;object-fit:contain}
     #invoicePrint .scroll{overflow:visible!important}
     #invoicePrint tr{break-inside:avoid}

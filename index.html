@@ -968,7 +968,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
 /* وحدة الحسابات والخزينة — متوافقة مع schema SQL Sunshine */
 (function(){
   const originalOpenPage=window.openPage;
-  let financeBanks=[], financeTx=[], financeCustomers=[], financeSettings=null, financeChecks=[], editingCheckId=null;
+  let financeBanks=[], financeTx=[], financeLogTx=[], financeCustomers=[], financeSettings=null, financeChecks=[], financeBalanceSnapshots=[], editingCheckId=null;
   const money=n=>Number(n||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2})+' جنيه';
   const today=()=>new Date().toISOString().slice(0,10);
   const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -982,7 +982,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
   }
   function accountLabel(type,id){if(type==='cash')return 'الخزينة النقدية';const b=financeBanks.find(x=>String(x.id)===String(id));return b?`${b.bank_name} — ${b.account_name||'بدون اسم'}`:'بنك غير محدد'}
   function calcBalances(){
-    let cash=0;const bank=new Map(financeBanks.map(b=>[String(b.id),Number(b.opening_balance||0)]));
+    let cash=Number(financeBalanceSnapshots.find(x=>x.account_type==='cash'&&Number(x.account_id)===0)?.balance||0);const bank=new Map(financeBanks.map(b=>{const snap=financeBalanceSnapshots.find(x=>x.account_type==='bank'&&String(x.account_id)===String(b.id));return [String(b.id),Number(snap?snap.balance:b.opening_balance||0)]}));
     for(const t of financeTx){const amount=Number(t.amount||0);
       if(t.kind==='transfer'){
         if(t.account_type==='cash')cash-=amount;else bank.set(String(t.account_id),(bank.get(String(t.account_id))||0)-amount);
@@ -996,17 +996,18 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
   }
   async function loadFinance(){
     if(!window.sb)return;
-    const [b,c]=await Promise.all([
+    const [b,c,snap]=await Promise.all([
       sb.from('bank_accounts').select('id,bank_name,account_name,account_number,opening_balance,is_active,created_at').order('bank_name'),
-      sb.from('customers').select('id,name,phone').order('name')
+      sb.from('customers').select('id,name,phone').order('name'),
+      sb.from('finance_balance_snapshots').select('account_type,account_id,balance')
     ]);
     if(b.error)throw b.error;
-    financeBanks=b.data||[];financeCustomers=c.error?[]:(c.data||[]);
+    financeBanks=b.data||[];financeCustomers=c.error?[]:(c.data||[]);if(snap.error)throw new Error('تعذر تحميل أرصدة ما بعد الأرشفة: '+snap.error.message+' — شغّل ملف SQL الخاص بتحديث الحركات المالية.');financeBalanceSnapshots=snap.data||[];
     // Paginate every transaction so bank/cash balances and statements are not understated after 500 rows.
     const pageSize=1000;let allTransactions=[],pageStart=0;
     while(true){
       const {data,error}=await sb.from('account_transactions')
-        .select('id,kind,account_type,account_id,target_account_type,target_account_id,amount,customer_id,transaction_date,description,created_at')
+        .select('id,kind,account_type,account_id,target_account_type,target_account_id,amount,customer_id,transaction_date,description,created_at,hidden_from_financial_log')
         .order('transaction_date',{ascending:true}).order('created_at',{ascending:true}).order('id',{ascending:true})
         .range(pageStart,pageStart+pageSize-1);
       if(error)throw error;
@@ -1014,7 +1015,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
       if(batch.length<pageSize)break;
       pageStart+=pageSize;
     }
-    financeTx=allTransactions;
+    financeTx=allTransactions;financeLogTx=allTransactions.filter(t=>!t.hidden_from_financial_log);
     const checks=await sb.from('company_checks').select('id,check_number,bank_name,drawer_name,customer_id,amount,issue_date,collection_date,notes,image_data,status,created_at').order('collection_date',{ascending:true});
     if(checks.error){financeChecks=[];console.warn('تعذر تحميل الشيكات:',checks.error.message)}
     else financeChecks=checks.data||[];
@@ -1024,7 +1025,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
     const body=(rows||[]).map(t=>{const kind=t.kind==='receipt'?'قبض':t.kind==='payment'?'صرف':'تحويل';const source=accountLabel(t.account_type,t.account_id);const target=t.kind==='transfer'?' ← '+accountLabel(t.target_account_type,t.target_account_id):'';const customer=financeCustomers.find(c=>String(c.id)===String(t.customer_id))?.name||'';return `<tr><td>${safe(t.transaction_date||'')}</td><td>${kind}</td><td>${safe(source+target)}</td><td>${money(t.amount)}</td><td>${safe(customer)}</td><td>${safe(t.description||'')}</td><td>${safe(t.archived_at||'')}</td></tr>`}).join('');
     return `<html dir="rtl" lang="ar"><meta charset="utf-8"><title>${title}</title><style>body{font-family:Arial,Tahoma;padding:24px;color:#222}h2{text-align:center}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{border:1px solid #aaa;padding:8px;text-align:right;font-size:12px}th{background:#f2f2f2}@media print{button{display:none}}</style><h2>صن شاين للاستيراد والتصدير</h2><h3>${title}</h3><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الحساب</th><th>المبلغ</th><th>العميل</th><th>البيان</th><th>تاريخ الأرشفة</th></tr></thead><tbody>${body||'<tr><td colspan="7">لا توجد حركات</td></tr>'}</tbody></table><script>window.onload=()=>window.print()<\/script></html>`;
   }
-  window.printFinancialMovements=function(){const html=financialMovementPrintHtml(financeTx,'سجل الحركات المالية النشطة');const w=window.open('','_blank');if(!w){alert('يرجى السماح بفتح النوافذ المنبثقة للطباعة');return}w.document.open();w.document.write(html);w.document.close()};
+  window.printFinancialMovements=function(){const html=financialMovementPrintHtml(financeLogTx,'سجل الحركات المالية النشطة');const w=window.open('','_blank');if(!w){alert('يرجى السماح بفتح النوافذ المنبثقة للطباعة');return}w.document.open();w.document.write(html);w.document.close()};
   let financialArchiveCache=[];
   window.loadFinancialArchive=async function(){
     const panel=el('financialArchivePanel'),host=el('financialArchiveRows'),msg=el('financialArchiveMsg');if(!panel||!host)return;panel.classList.remove('hidden');host.innerHTML='<tr><td colspan="7">جارٍ تحميل الأرشيف...</td></tr>';
@@ -1035,8 +1036,12 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
   };
   window.printFinancialArchive=function(){const html=financialMovementPrintHtml(financialArchiveCache,'أرشيف الحركات المالية');const w=window.open('','_blank');if(!w){alert('يرجى السماح بفتح النوافذ المنبثقة للطباعة');return}w.document.open();w.document.write(html);w.document.close()};
   window.archiveFinancialMovements=async function(){
-    if(role!=='admin'){alert('الأرشفة متاحة للمدير فقط');return}if(!confirm('سيتم نقل جميع الحركات المالية النشطة إلى الأرشيف مع الاحتفاظ بها وإخراجها من حساب الأرصدة الحالية. لن يتم حذف مديونيات العملاء أو كشوف حساباتهم أو الفواتير. هل تريد المتابعة؟'))return;
+    if(role!=='admin'){alert('الأرشفة متاحة للمدير فقط');return}if(!confirm('سيتم نقل الحركات المالية النشطة إلى الأرشيف مع الاحتفاظ بكل بياناتها، مع تثبيت أرصدة الخزينة والبنوك. لن تُحذف الفواتير أو السندات أو كشوف العملاء والموردين. هل تريد المتابعة؟'))return;
     const {data,error}=await sb.rpc('admin_archive_account_transactions');if(error){alert('تعذرت الأرشفة: '+error.message+' — تأكد من تشغيل ملف SQL المرفق.');return}alert('تمت أرشفة '+Number(data?.archived_count||0)+' حركة مالية بنجاح.');await refreshFinancePage();await loadFinancialArchive();
+  };
+  window.clearFinancialMovements=async function(){
+    if(role!=='admin'){alert('مسح سجل الحركات متاح للمدير فقط');return}if(!confirm('سيتم إخفاء الحركات الحالية من سجل العرض فقط دون حذفها من قاعدة البيانات أو من العمليات المحاسبية. ستظل الفواتير والسندات وكشوف العملاء والموردين وأرصدة الخزينة والبنوك كما هي. هل تريد المتابعة؟'))return;
+    const {data,error}=await sb.rpc('admin_clear_account_transactions_preserve_balances');if(error){alert('تعذر مسح سجل الحركات: '+error.message+' — تأكد من تشغيل ملف SQL المرفق.');return}alert('تم إخفاء '+Number(data?.cleared_count||0)+' حركة من سجل العرض، مع الاحتفاظ بكل العمليات والأرصدة.');await refreshFinancePage();
   };
   window.restoreFinancialArchive=async function(){
     if(role!=='admin'){alert('الاستعادة متاحة للمدير فقط');return}if(!confirm('سيتم استعادة جميع الحركات المؤرشفة إلى سجل الحركات النشط وإعادة احتساب أرصدة الخزينة والبنوك. هل تريد المتابعة؟'))return;
@@ -1080,7 +1085,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
     const bankRows=financeBanks.map(b=>`<tr><td>${safe(b.bank_name)}</td><td>${safe(b.account_name||'')}</td><td>${safe(b.account_number||'')}</td><td>${money(b.opening_balance)}</td><td>${money(bal.bank.get(String(b.id))||0)}</td><td>${b.is_active?'نشط':'موقوف'}</td><td>${role==='admin'?`<button type="button" onclick="editFinanceBank('${safe(b.id)}')">تعديل</button> <button type="button" class="secondary" onclick="openBankStatementFor('${safe(b.id)}')">كشف الحساب</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="7">لا توجد حسابات بنكية حتى الآن.</td></tr>';
     const custOpts=financeCustomers.map(c=>`<option value="${safe(c.id)}">${safe(c.name)}</option>`).join('');
     const bankOpts=financeBanks.filter(b=>b.is_active).map(b=>`<option value="${safe(b.id)}">${safe(b.bank_name)} — ${safe(b.account_name||'')}</option>`).join('');
-    const txRows=financeTx.map(t=>{const kind=t.kind==='receipt'?'قبض':t.kind==='payment'?'صرف':'تحويل';const source=accountLabel(t.account_type,t.account_id);const target=t.kind==='transfer'?' ← '+accountLabel(t.target_account_type,t.target_account_id):'';const customer=financeCustomers.find(c=>String(c.id)===String(t.customer_id))?.name||'';return `<tr><td>${safe(t.transaction_date)}</td><td>${kind}</td><td>${safe(source+target)}</td><td>${money(t.amount)}</td><td>${safe(customer)}</td><td>${safe(t.description||'')}</td></tr>`}).join('')||'<tr><td colspan="6">لا توجد حركات مالية مسجلة.</td></tr>';
+    const txRows=financeLogTx.map(t=>{const kind=t.kind==='receipt'?'قبض':t.kind==='payment'?'صرف':'تحويل';const source=accountLabel(t.account_type,t.account_id);const target=t.kind==='transfer'?' ← '+accountLabel(t.target_account_type,t.target_account_id):'';const customer=financeCustomers.find(c=>String(c.id)===String(t.customer_id))?.name||'';return `<tr><td>${safe(t.transaction_date)}</td><td>${kind}</td><td>${safe(source+target)}</td><td>${money(t.amount)}</td><td>${safe(customer)}</td><td>${safe(t.description||'')}</td></tr>`}).join('')||'<tr><td colspan="6">لا توجد حركات مالية مسجلة.</td></tr>';
     return `<h3>الحسابات والخزينة</h3><p class="muted">جميع المبالغ بالجنيه المصري فقط. الأرصدة محسوبة من الرصيد الافتتاحي للبنوك والحركات المسجلة في هذا الجدول.</p>
       <div class="finance-stats"><div class="finance-stat"><b>رصيد الخزينة</b><strong>${money(bal.cash)}</strong></div><div class="finance-stat"><b>إجمالي أرصدة البنوك</b><strong>${money([...bal.bank.values()].reduce((a,b)=>a+b,0))}</strong></div><div class="finance-stat"><b>إجمالي النقدية والبنوك</b><strong>${money(bal.total)}</strong></div></div>
       <div class="finance-section"><h3>تسجيل حركة مالية</h3><div class="finance-form">
@@ -1107,8 +1112,8 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
       ${role==='admin'?`<div class="finance-section" style="border:1px solid #e7c5d5;background:#fffafd"><h4>تصفير رصيد الخزينة بتسجيل المصروف</h4><p>الرصيد المتاح الآن: <b>${money(bal.cash)}</b></p><div class="finance-form"><div><label>المبلغ الذي تم صرفه</label><input id="cashZeroAmount" type="number" min="0.01" step="0.01" value="${Math.max(0,bal.cash).toFixed(2)}"></div><div><label>اتصرفت الفلوس في إيه؟ (البيان إلزامي)</label><input id="cashZeroReason" maxlength="500" placeholder="مثال: مصروفات تشغيل / مشتريات / رواتب"></div><div><label>تاريخ الصرف</label><input id="cashZeroDate" type="date" value="${today()}"></div></div><div class="finance-actions"><button type="button" style="background:#a90d58" onclick="zeroCashboxWithExpense()">تسجيل الصرف وتصفير الخزينة</button></div><p class="muted">سيتم إنشاء سند صرف عادي بالمبلغ والبيان المدخلين، وسيظل ظاهرًا في كشف الخزينة وسجل الحركات والأرشيف عند أرشفته.</p></div>`:''}
       </div>
       <div class="finance-section"><h3>سجل الحركات المالية</h3>
-        ${role==='admin'?`<div class="finance-actions"><button type="button" style="background:#a90d58" onclick="archiveFinancialMovements()">مسح سجل الحركات المالية (نقل إلى الأرشيف)</button><button type="button" class="secondary" onclick="printFinancialMovements()">طباعة الحركات المالية</button><button type="button" class="secondary" onclick="loadFinancialArchive()">عرض الأرشيف</button></div>`:`<div class="finance-actions"><button type="button" class="secondary" onclick="printFinancialMovements()">طباعة الحركات المالية</button></div>`}
-        <p class="muted">الأرشفة تحفظ الحركات للرجوع إليها ولا تمسح مديونيات العملاء أو كشوف حساباتهم. بعد الأرشفة تُحسب أرصدة الخزينة والبنوك من الأرصدة الافتتاحية والحركات النشطة فقط.</p>
+        ${role==='admin'?`<div class="finance-actions"><button type="button" style="background:#b42318" onclick="clearFinancialMovements()">مسح سجل العرض</button><button type="button" style="background:#a90d58" onclick="archiveFinancialMovements()">حفظ في الأرشيف</button><button type="button" class="secondary" onclick="printFinancialMovements()">طباعة الحركات المالية</button><button type="button" class="secondary" onclick="loadFinancialArchive()">عرض الأرشيف</button></div>`:`<div class="finance-actions"><button type="button" class="secondary" onclick="printFinancialMovements()">طباعة الحركات المالية</button></div>`}
+        <p class="muted">المسح يخفي الحركات من سجل العرض فقط ولا يحذف أي عملية من قاعدة البيانات. الأرشفة تحفظ جميع بيانات الحركات للرجوع إليها، ولا تمس الفواتير أو السندات أو كشوف العملاء والموردين.</p>
         <div class="finance-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الحساب</th><th>المبلغ</th><th>العميل</th><th>البيان</th></tr></thead><tbody>${txRows}</tbody></table></div>
         <div id="financialArchivePanel" class="hidden" style="margin-top:16px"><h4>أرشيف الحركات المالية</h4><div class="finance-actions"><button type="button" class="secondary" onclick="printFinancialArchive()">طباعة الأرشيف</button>${role==='admin'?`<button type="button" style="background:#168b55" onclick="restoreFinancialArchive()">استعادة جميع الحركات من الأرشيف</button>`:''}</div><p id="financialArchiveMsg" class="msg"></p><div class="finance-table"><table><thead><tr><th>تاريخ الحركة</th><th>النوع</th><th>الحساب</th><th>المبلغ</th><th>العميل</th><th>البيان</th><th>تاريخ الأرشفة</th></tr></thead><tbody id="financialArchiveRows"><tr><td colspan="7">اضغط عرض الأرشيف.</td></tr></tbody></table></div></div>
       </div>

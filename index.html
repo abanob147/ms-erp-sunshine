@@ -850,10 +850,15 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
         <div class="finance-form"><div><label>اختر الحساب البنكي</label><select id="bankStatementAccount"><option value="">-- اختر البنك --</option>${financeBanks.map(b=>`<option value="${safe(b.id)}">${safe(b.bank_name)} — ${safe(b.account_name||'')}</option>`).join('')}</select></div><div><label>من تاريخ</label><input id="bankStatementFrom" type="date"></div><div><label>إلى تاريخ</label><input id="bankStatementTo" type="date"></div></div>
         <div class="finance-actions"><button type="button" onclick="loadBankStatement()">عرض كشف الحساب</button><button type="button" class="secondary" onclick="printBankStatement()">طباعة / حفظ PDF</button></div><p id="bankStatementMsg" class="msg"></p><div id="bankStatementResult"></div></div>
       <div class="finance-section"><h3>سجل الحركات المالية</h3><div class="finance-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الحساب</th><th>المبلغ</th><th>العميل</th><th>البيان</th></tr></thead><tbody>${txRows}</tbody></table></div></div>
-      <div class="finance-section"><h3>كشف حساب مجمع للعملاء والمندوبين</h3><p class="muted">يعرض مديونيات العملاء ومندوبي المبيعات مع تمييز نوع الحساب ورقم الهاتف وإجمالي المبلغ المستحق.</p>
-        <div class="finance-actions"><button type="button" onclick="loadAggregateCustomerDebts()">عرض / تحديث الكشف المجمع</button><button type="button" class="secondary" onclick="printAggregateCustomerDebts()">طباعة / حفظ PDF</button></div>
+      <div class="finance-section"><h3>كشف حساب مجمع للعملاء</h3><p class="muted">هذا الكشف يعرض العملاء المسجلين فقط، ولا يتضمن أرصدة مندوبي المبيعات.</p>
+        <div class="finance-actions"><button type="button" onclick="loadAggregateCustomerDebts()">عرض / تحديث مديونيات العملاء</button><button type="button" class="secondary" onclick="printAggregateCustomerDebts()">طباعة / حفظ PDF</button></div>
         <p id="aggregateDebtMsg" class="msg" aria-live="polite"></p><div id="aggregateDebtSummary" class="finance-stats"></div>
-        <div class="finance-table"><table><thead><tr><th>اسم العميل</th><th>رقم الهاتف</th><th>المبلغ المدين به</th></tr></thead><tbody id="aggregateDebtRows"><tr><td colspan="3">اضغط «عرض / تحديث الكشف المجمع» لعرض مديونيات العملاء.</td></tr></tbody></table></div>
+        <div class="finance-table"><table><thead><tr><th>اسم العميل</th><th>رقم الهاتف</th><th>المبلغ المدين به</th></tr></thead><tbody id="aggregateDebtRows"><tr><td colspan="3">اضغط «عرض / تحديث مديونيات العملاء».</td></tr></tbody></table></div>
+      </div>
+      <div class="finance-section"><h3>كشف حساب مجمع للمندوبين</h3><p class="muted">هذا الكشف يعرض مديونيات مندوبي المبيعات فقط، بشكل منفصل تماماً عن العملاء.</p>
+        <div class="finance-actions"><button type="button" onclick="loadAggregateRepDebts()">عرض / تحديث مديونيات المندوبين</button><button type="button" class="secondary" onclick="printAggregateRepDebts()">طباعة / حفظ PDF</button></div>
+        <p id="aggregateRepDebtMsg" class="msg" aria-live="polite"></p><div id="aggregateRepDebtSummary" class="finance-stats"></div>
+        <div class="finance-table"><table><thead><tr><th>اسم المندوب</th><th>رقم الهاتف</th><th>المبلغ المستحق على المندوب</th></tr></thead><tbody id="aggregateRepDebtRows"><tr><td colspan="3">اضغط «عرض / تحديث مديونيات المندوبين».</td></tr></tbody></table></div>
       </div>
       <div class="finance-section"><h3>كشف حساب عميل</h3><p class="muted">الكشف يعتمد على الحركات المحفوظة في جدول customer_transactions، مع رصيد متحرك ورصيد سابق للفترة.</p>
         <div class="finance-form"><div><label>اختر العميل</label><select id="statementCustomer"><option value="">-- اختر العميل --</option>${custOpts}</select></div>
@@ -864,11 +869,12 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
   }
 
   let aggregateCustomerDebtRows=[];
+  let aggregateRepDebtRows=[];
   window.loadAggregateCustomerDebts=async function(){
     const msg=el('aggregateDebtMsg'),host=el('aggregateDebtRows'),summary=el('aggregateDebtSummary');
     if(!host||!window.sb)return;
-    if(msg){msg.textContent='جارٍ تجميع مديونيات العملاء...';msg.className='msg'}
-    host.innerHTML='<tr><td colspan="3">جارٍ تحميل البيانات...</td></tr>';
+    if(msg){msg.textContent='جارٍ تجميع مديونيات العملاء فقط...';msg.className='msg'}
+    host.innerHTML='<tr><td colspan="3">جارٍ تحميل مديونيات العملاء...</td></tr>';
     try{
       const balances=new Map();let start=0;const pageSize=1000;
       while(true){
@@ -879,32 +885,62 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
         const batch=data||[];
         for(const row of batch){
           const key=String(row.customer_id);
-          const current=balances.get(key)||0;
-          balances.set(key,current+Number(row.debit||0)-Number(row.credit||0));
+          balances.set(key,(balances.get(key)||0)+Number(row.debit||0)-Number(row.credit||0));
         }
         if(batch.length<pageSize)break;
         start+=pageSize;
       }
-      aggregateCustomerDebtRows=financeCustomers.map(c=>({
-        id:c.id,name:c.name||'—',phone:c.phone||'—',partyType:'عميل',balance:Math.max(0,Number(balances.get(String(c.id))||0))
-      })).filter(c=>c.balance>0.005);
-      const repsResult=await sb.from('sales_rep_transactions').select('sales_rep_id,debit,credit');
-      if(repsResult.error)throw repsResult.error;
-      const repBalances=new Map();for(const t of repsResult.data||[]){const k=String(t.sales_rep_id);repBalances.set(k,(repBalances.get(k)||0)+Number(t.debit||0)-Number(t.credit||0));}
-      for(const rep of (salesRepsCache||[])){const balance=Math.max(0,Number(repBalances.get(String(rep.id))||0));if(balance>0.005)aggregateCustomerDebtRows.push({id:rep.id,name:rep.name||'—',phone:rep.phone||'—',partyType:'مندوب',balance});}
-      aggregateCustomerDebtRows.sort((a,b)=>b.balance-a.balance);
+      aggregateCustomerDebtRows=(financeCustomers||[]).map(c=>({
+        id:c.id,name:c.name||'—',phone:c.phone||'—',
+        balance:Math.max(0,Number(balances.get(String(c.id))||0))
+      })).filter(c=>c.balance>0.005).sort((a,b)=>b.balance-a.balance);
       const total=aggregateCustomerDebtRows.reduce((sum,c)=>sum+c.balance,0);
-      host.innerHTML=aggregateCustomerDebtRows.map(c=>`<tr><td>${safe(c.name)} <b style="color:#a90d58">(${safe(c.partyType)})</b></td><td dir="ltr">${safe(c.phone)}</td><td><b>${money(c.balance)}</b></td></tr>`).join('')||'<tr><td colspan="3">لا توجد مديونيات قائمة على العملاء أو المندوبين.</td></tr>';
-      if(summary)summary.innerHTML=`<div class="finance-stat"><b>إجمالي المديونيات</b><strong>${money(total)}</strong></div><div class="finance-stat"><b>عدد العملاء والمندوبين المدينين</b><strong>${aggregateCustomerDebtRows.length}</strong></div>`;
-      if(msg){msg.textContent='تم تحديث الكشف المجمع بنجاح.';msg.className='msg ok'}
-    }catch(e){host.innerHTML='<tr><td colspan="3">تعذر تحميل الكشف المجمع: '+safe(e.message)+'</td></tr>';if(msg){msg.textContent='تعذر تحميل الكشف المجمع: '+e.message;msg.className='msg error'}}
+      host.innerHTML=aggregateCustomerDebtRows.map(c=>`<tr><td>${safe(c.name)}</td><td dir="ltr">${safe(c.phone)}</td><td><b>${money(c.balance)}</b></td></tr>`).join('')||'<tr><td colspan="3">لا توجد مديونيات قائمة على العملاء.</td></tr>';
+      if(summary)summary.innerHTML=`<div class="finance-stat"><b>إجمالي مديونيات العملاء</b><strong>${money(total)}</strong></div><div class="finance-stat"><b>عدد العملاء المدينين</b><strong>${aggregateCustomerDebtRows.length}</strong></div>`;
+      if(msg){msg.textContent='تم تحديث كشف العملاء فقط بنجاح.';msg.className='msg ok'}
+    }catch(e){host.innerHTML='<tr><td colspan="3">تعذر تحميل كشف العملاء: '+safe(e.message)+'</td></tr>';if(msg){msg.textContent='تعذر تحميل كشف العملاء: '+e.message;msg.className='msg error'}}
   };
   window.printAggregateCustomerDebts=function(){
-    if(!aggregateCustomerDebtRows.length){alert('اعرض الكشف المجمع أولاً.');return}
+    if(!aggregateCustomerDebtRows.length){alert('اعرض كشف مديونيات العملاء أولاً.');return}
     const total=aggregateCustomerDebtRows.reduce((sum,c)=>sum+c.balance,0);
-    const rows=aggregateCustomerDebtRows.map(c=>`<tr><td>${safe(c.name)} (${safe(c.partyType||'عميل')})</td><td dir="ltr">${safe(c.phone)}</td><td>${money(c.balance)}</td></tr>`).join('');
+    const rows=aggregateCustomerDebtRows.map(c=>`<tr><td>${safe(c.name)}</td><td dir="ltr">${safe(c.phone)}</td><td>${money(c.balance)}</td></tr>`).join('');
     const w=window.open('','_blank','width=1000,height=750');if(!w){alert('اسمح بفتح النوافذ المنبثقة للطباعة.');return}
-    w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>كشف حساب مجمع للعملاء</title><style>body{font-family:Arial,Tahoma,sans-serif;padding:24px;color:#111}h2,h3{text-align:center}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #777;padding:10px;text-align:center}th{background:#eee}.total{font-size:20px;font-weight:bold;margin-top:18px}</style></head><body><h2>صن شاين للاستيراد والتصدير</h2><h3>كشف حساب مجمع بمديونيات العملاء والمندوبين</h3><p>تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG',{timeZone:'Africa/Cairo'})}</p><table><thead><tr><th>اسم العميل</th><th>رقم الهاتف</th><th>المبلغ المدين به</th></tr></thead><tbody>${rows}</tbody></table><div class="total">إجمالي مديونيات العملاء: ${money(total)} | عدد العملاء: ${aggregateCustomerDebtRows.length}</div><script>window.onload=()=>window.print()<\/script></body></html>`);
+    w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>كشف مديونيات العملاء</title><style>body{font-family:Arial,Tahoma,sans-serif;padding:24px;color:#111}h2,h3{text-align:center}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #777;padding:10px;text-align:center}th{background:#eee}.total{font-size:20px;font-weight:bold;margin-top:18px}</style></head><body><h2>صن شاين للاستيراد والتصدير</h2><h3>كشف حساب مجمع للعملاء فقط</h3><p>تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG',{timeZone:'Africa/Cairo'})}</p><table><thead><tr><th>اسم العميل</th><th>رقم الهاتف</th><th>المبلغ المدين به</th></tr></thead><tbody>${rows}</tbody></table><div class="total">إجمالي مديونيات العملاء: ${money(total)} | عدد العملاء: ${aggregateCustomerDebtRows.length}</div><script>window.onload=()=>window.print()<\/script></body></html>`);
+    w.document.close();
+  };
+  window.loadAggregateRepDebts=async function(){
+    const msg=el('aggregateRepDebtMsg'),host=el('aggregateRepDebtRows'),summary=el('aggregateRepDebtSummary');
+    if(!host||!window.sb)return;
+    if(msg){msg.textContent='جارٍ تجميع مديونيات المندوبين فقط...';msg.className='msg'}
+    host.innerHTML='<tr><td colspan="3">جارٍ تحميل مديونيات المندوبين...</td></tr>';
+    try{
+      const [txResult,repResult]=await Promise.all([
+        sb.from('sales_rep_transactions').select('sales_rep_id,debit,credit'),
+        sb.from('sales_reps').select('id,name,phone')
+      ]);
+      if(txResult.error)throw txResult.error;
+      if(repResult.error)throw repResult.error;
+      const balances=new Map();
+      for(const t of txResult.data||[]){
+        const key=String(t.sales_rep_id);
+        balances.set(key,(balances.get(key)||0)+Number(t.debit||0)-Number(t.credit||0));
+      }
+      aggregateRepDebtRows=(repResult.data||[]).map(r=>({
+        id:r.id,name:r.name||'—',phone:r.phone||'—',
+        balance:Math.max(0,Number(balances.get(String(r.id))||0))
+      })).filter(r=>r.balance>0.005).sort((a,b)=>b.balance-a.balance);
+      const total=aggregateRepDebtRows.reduce((sum,r)=>sum+r.balance,0);
+      host.innerHTML=aggregateRepDebtRows.map(r=>`<tr><td>${safe(r.name)}</td><td dir="ltr">${safe(r.phone)}</td><td><b>${money(r.balance)}</b></td></tr>`).join('')||'<tr><td colspan="3">لا توجد مديونيات قائمة على المندوبين.</td></tr>';
+      if(summary)summary.innerHTML=`<div class="finance-stat"><b>إجمالي مديونيات المندوبين</b><strong>${money(total)}</strong></div><div class="finance-stat"><b>عدد المندوبين المدينين</b><strong>${aggregateRepDebtRows.length}</strong></div>`;
+      if(msg){msg.textContent='تم تحديث كشف المندوبين فقط بنجاح.';msg.className='msg ok'}
+    }catch(e){host.innerHTML='<tr><td colspan="3">تعذر تحميل كشف المندوبين: '+safe(e.message)+'</td></tr>';if(msg){msg.textContent='تعذر تحميل كشف المندوبين: '+e.message;msg.className='msg error'}}
+  };
+  window.printAggregateRepDebts=function(){
+    if(!aggregateRepDebtRows.length){alert('اعرض كشف مديونيات المندوبين أولاً.');return}
+    const total=aggregateRepDebtRows.reduce((sum,r)=>sum+r.balance,0);
+    const rows=aggregateRepDebtRows.map(r=>`<tr><td>${safe(r.name)}</td><td dir="ltr">${safe(r.phone)}</td><td>${money(r.balance)}</td></tr>`).join('');
+    const w=window.open('','_blank','width=1000,height=750');if(!w){alert('اسمح بفتح النوافذ المنبثقة للطباعة.');return}
+    w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>كشف مديونيات المندوبين</title><style>body{font-family:Arial,Tahoma,sans-serif;padding:24px;color:#111}h2,h3{text-align:center}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #777;padding:10px;text-align:center}th{background:#eee}.total{font-size:20px;font-weight:bold;margin-top:18px}</style></head><body><h2>صن شاين للاستيراد والتصدير</h2><h3>كشف حساب مجمع للمندوبين فقط</h3><p>تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG',{timeZone:'Africa/Cairo'})}</p><table><thead><tr><th>اسم المندوب</th><th>رقم الهاتف</th><th>المبلغ المستحق على المندوب</th></tr></thead><tbody>${rows}</tbody></table><div class="total">إجمالي مديونيات المندوبين: ${money(total)} | عدد المندوبين: ${aggregateRepDebtRows.length}</div><script>window.onload=()=>window.print()<\/script></body></html>`);
     w.document.close();
   };
 

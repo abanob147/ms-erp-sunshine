@@ -135,7 +135,26 @@ async function renderSalesRepRows(){
  const {data:tx,error}=await sb.from('sales_rep_transactions').select('sales_rep_id,debit,credit').order('id');
  if(error){host.innerHTML='<tr><td colspan="5">تعذر تحميل المديونيات: '+esc(error.message)+'</td></tr>';return}
  const sums=new Map();for(const t of tx||[]){const k=String(t.sales_rep_id);sums.set(k,(sums.get(k)||0)+Number(t.debit||0)-Number(t.credit||0));}
- host.innerHTML=salesRepsCache.map(r=>{const balance=Number(sums.get(String(r.id))||0);const paid=Math.abs(balance)<0.005;return `<tr><td>${esc(r.name)}</td><td>${esc(r.username||'')}</td><td>${esc(r.phone||'')}</td><td>${balance.toLocaleString('ar-EG')} ج.م</td><td><button type="button" class="secondary" onclick="document.getElementById('repStatementSelect').value='${r.id}';loadSalesRepStatement()">كشف الحساب</button> ${paid?`<button type="button" style="background:#b42318" onclick="deactivateSalesRep('${r.id}')">مسح المندوب</button>`:'<span class="muted">لا يمكن المسح قبل سداد المديونية</span>'}</td></tr>`}).join('')||'<tr><td colspan="5">لا يوجد مندوبون مسجلون.</td></tr>';
+ host.innerHTML=salesRepsCache.map(r=>{const balance=Number(sums.get(String(r.id))||0);const paid=Math.abs(balance)<0.005;return `<tr><td>${esc(r.name)}</td><td>${esc(r.username||'')}</td><td>${esc(r.phone||'')}</td><td>${balance.toLocaleString('ar-EG')} ج.م</td><td><button type="button" class="secondary" onclick="document.getElementById('repStatementSelect').value='${r.id}';loadSalesRepStatement()">كشف الحساب</button> <button type="button" class="secondary" onclick="editSalesRep('${r.id}')">تعديل</button> ${paid?`<button type="button" style="background:#b42318" onclick="deactivateSalesRep('${r.id}')">مسح المندوب</button>`:'<span class="muted">لا يمكن المسح قبل سداد المديونية</span>'}</td></tr>`}).join('')||'<tr><td colspan="5">لا يوجد مندوبون مسجلون.</td></tr>';
+}
+async function editSalesRep(id){
+ if(role!=='admin'){alert('تعديل بيانات المندوب متاح للمدير فقط');return}
+ const rep=salesRepsCache.find(x=>String(x.id)===String(id));
+ if(!rep){alert('لم يتم العثور على بيانات المندوب');return}
+ const name=prompt('اسم المندوب:',rep.name||'');
+ if(name===null)return;
+ const cleanName=name.trim();
+ if(!cleanName){alert('اسم المندوب مطلوب');return}
+ const phone=prompt('رقم الهاتف:',rep.phone||'');
+ if(phone===null)return;
+ const address=prompt('العنوان:',rep.address||'');
+ if(address===null)return;
+ const {error}=await sb.from('sales_reps')
+   .update({name:cleanName,phone:phone.trim()||null,address:address.trim()||null})
+   .eq('id',id);
+ if(error){alert('تعذر تعديل بيانات المندوب: '+error.message);return}
+ alert('تم تعديل بيانات المندوب بنجاح.');
+ await loadSalesReps();
 }
 async function deactivateSalesRep(id){
  if(role!=='admin'){alert('مسح المندوب متاح للمدير فقط');return}

@@ -2114,6 +2114,8 @@ function printInvoiceDocument(printWindow=null){
     .print-field-value{display:inline-block;min-height:18px;white-space:pre-wrap;overflow-wrap:anywhere;font-weight:600;border:0!important;text-decoration:none!important;background:transparent!important;box-shadow:none!important}
     #invoicePrint th,#invoicePrint td{border:1px solid #777!important;padding:6px 5px!important;color:#111!important;text-align:right;vertical-align:top}
     #invoicePrint th{background:#f8e8f0!important;font-weight:800}
+    /* Make each item-row amount (إجمالي السطر داخل بيان الفاتورة) prominent. */
+    #invoicePrint td.line-total{font-size:15px!important;font-weight:900!important;color:#111!important;font-variant-numeric:tabular-nums}
     .invoice-total{max-width:300px;margin:10px 0 0 auto}
     .invoice-total>div{display:flex;justify-content:space-between;padding:5px;border-bottom:1px solid #bbb}
     #invoicePrint .invoice-total>div:first-child{font-size:17px;font-weight:900;padding:9px 7px;border-bottom:2px solid #333;background:#fff8fb}

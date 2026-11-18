@@ -109,7 +109,14 @@ async function loadSalesReps(){
  if(error){salesRepsCache=[];const m=$('repMsg');if(m)m.textContent='تعذر تحميل المندوبين: '+error.message+' — نفّذ ملف SQL المرفق أولاً.';return}
  salesRepsCache=data||[];
  const {data:{user}}=await sb.auth.getUser();
+ // اربط حساب المندوب بالمعرّف الحالي أولاً. إذا حُذف حساب الدخول القديم
+ // ثم أُعيد إنشاء الحساب بنفس اسم المستخدم، استخدم اسم الدخول كحل احتياطي.
+ const loginUsername=String(user?.email||'').split('@')[0].trim().toLowerCase();
  currentSalesRep=salesRepsCache.find(r=>String(r.user_id)===String(user?.id))||null;
+ if(!currentSalesRep && loginUsername){
+   const usernameMatches=salesRepsCache.filter(r=>String(r.username||'').trim().toLowerCase()===loginUsername);
+   if(usernameMatches.length===1) currentSalesRep=usernameMatches[0];
+ }
  const options='<option value="">-- بدون مندوب --</option>'+salesRepsCache.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('');
  const inv=$('invoiceSalesRep');if(inv){inv.innerHTML=options;if(currentSalesRep){inv.value=String(currentSalesRep.id);inv.disabled=true;inv.closest('div')?.classList.remove('hidden')}else{inv.disabled=role!=='admin';if(role!=='admin')inv.closest('div')?.classList.add('hidden')}}
  const st=$('repStatementSelect');if(st){const old=st.value;st.innerHTML='<option value="">اختر المندوب</option>'+salesRepsCache.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('');if(old)st.value=old}

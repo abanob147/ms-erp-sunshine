@@ -98,15 +98,15 @@ body button, body input, body select, body textarea, body label { font-weight: 6
 </div><p class="muted no-print">راجع الأصناف والكميات والأسعار قبل الحفظ. الحفظ يخصم المخزون من قاعدة البيانات من خلال عملية واحدة.</p></div>
 <div id="returns" class="card hidden">
 <h3>مرتجعات المبيعات</h3>
-<p class="muted">يسجل الموظف طلب مرتجع من فاتورة مبيعات أصلية فقط. لا يتغير المخزون عند إنشاء الطلب. اعتماد المدير يعيد الكمية إلى رصيد الصنف. التسوية النقدية وكشف العميل يظلان غير مرحّلين حتى ربطهما بجداول الحسابات المعتمدة.</p>
+<p class="muted">يسجل الموظف طلب مرتجع من فاتورة مبيعات أصلية فقط. لا يتغير المخزون أو رصيد العميل عند إنشاء الطلب. عند اعتماد المدير تُعاد الكمية إلى المخزون وتُضاف قيمة المرتجع إلى رصيد العميل في كشف الحساب بالجنيه المصري، مرة واحدة فقط.</p>
 <div class="finance-section"><h4>إنشاء طلب مرتجع</h4><div class="grid">
 <div><label>فاتورة المبيعات الأصلية</label><select id="returnSaleSelect" onchange="returnLoadLines()"><option value="">جارٍ تحميل الفواتير...</option></select></div>
 <div><label>الصنف من الفاتورة</label><select id="returnLineSelect"><option value="">اختر الفاتورة أولاً</option></select></div>
 <div><label>الكمية المرتجعة</label><input id="returnQty" type="number" min="0.001" step="0.001"></div>
 <div><label>سبب المرتجع</label><input id="returnReason" placeholder="اكتب سبب المرتجع"></div>
 </div><div class="invoice-actions"><button type="button" onclick="returnSubmitRequest()">إرسال طلب للمدير</button><button type="button" class="secondary" onclick="returnLoadSales()">تحديث الفواتير</button></div><p id="returnMsg" class="msg"></p></div>
-<div class="finance-section"><h4>طلبات المرتجعات</h4><div class="scroll"><table><thead><tr><th>التاريخ</th><th>الفاتورة</th><th>الصنف</th><th>الكمية</th><th>السبب</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody id="returnRows"><tr><td colspan="7">جارٍ التحميل...</td></tr></tbody></table></div></div>
-<p class="muted">ملاحظة: هذه النسخة تمنع اعتماد الطلب مرتين وتعيد المخزون إلى items.opening_quantity فقط. لم يتم ربط رد الأموال أو كشف حساب العميل تلقائيًا لأن بنية جداول الحسابات وكشف العملاء لم تُفحص بعد.</p>
+<div class="finance-section"><h4>طلبات المرتجعات</h4><div class="scroll"><table><thead><tr><th>التاريخ</th><th>الفاتورة</th><th>الصنف</th><th>الكمية</th><th>قيمة المرتجع</th><th>حالة الطلب</th><th>حالة رصيد العميل</th><th>الإجراء</th></tr></thead><tbody id="returnRows"><tr><td colspan="8">جارٍ التحميل...</td></tr></tbody></table></div></div>
+<p class="muted">ملاحظة: تنفيذ التسوية المالية يتطلب تشغيل تحديث SQL الخاص بالمرتجعات في Supabase أولًا. قيمة المرتجع تُسجل كرصيد دائن للعميل ولا تُصرف نقدًا من الخزينة تلقائيًا.</p>
 </div><div id="placeholder" class="card hidden"><h3 id="placeholderTitle"></h3><p class="muted">هذه الوحدة في مرحلة التوصيل بقاعدة البيانات.</p></div></main></div></section></div>
 <script>
 let sb=null,role=null,itemsCache=[],warehousesCache=[],warehouseBalancesCache=[],customersCache=[],salesRepsCache=[],currentSalesRep=null,pendingSaleRequestId=null,editingItemId=null,editingCustomerId=null,editingSaleId=null;const $=id=>document.getElementById(id);
@@ -1230,7 +1230,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
     if(!customer){financeMsg('statementMsg','لم يتم العثور على بيانات العميل.',false);return}
     financeMsg('statementMsg','جارٍ تحميل كشف الحساب...',true);
     const {data,error}=await sb.from('customer_transactions')
-      .select('id,customer_id,transaction_date,description,debit,credit,currency,sale_invoice_id,financial_transaction_id')
+      .select('id,customer_id,transaction_date,description,debit,credit,currency,sale_invoice_id,financial_transaction_id,return_request_id')
       .eq('customer_id',customerId)
       .order('transaction_date',{ascending:true}).order('id',{ascending:true});
     if(error){financeMsg('statementMsg','تعذر تحميل كشف الحساب: '+error.message,false);return}
@@ -1261,6 +1261,8 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
     // منع تكرار الفاتورة في الكشف وفي إجمالي الرصيد، حتى لو اختلف نص البيان.
     const seenInvoices=new Map(),all=[];
     for(const x of raw){
+      // Return-credit rows are separate ledger movements even when linked to the original invoice.
+      if(x.return_request_id){all.push(x);continue;}
       const linkedId=x.sale_invoice_id;
       const linked=linkedId ? invoiceNumbers.get(String(linkedId)) : '';
       const match=String(x.description||'').match(/(?:INV|inv)[-\s/#]*[A-Z0-9-]+/i);
@@ -1277,7 +1279,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
     const body=rows.map(x=>{
       const invoiceId=x.sale_invoice_id;
       const invoiceNo=invoiceId?(invoiceNumbers.get(String(invoiceId))||('#'+invoiceId)):'';
-      const names=invoiceId?(invoiceItems.get(String(invoiceId))||[]):[];
+      const names=invoiceId&&!x.return_request_id?(invoiceItems.get(String(invoiceId))||[]):[];
       const description=names.length?names.map(item=>safe(item.name)+' × '+Number(item.quantity).toLocaleString('ar-EG')+' × '+fmt(item.price)+' جنيه').join(' | '):(x.description||'');
       x.displayDescription=description;
       return `<tr><td>${safe(x.transaction_date||'')}</td><td><span style="font-size:11px;line-height:1.6;font-weight:600">${description}</span></td><td>${invoiceNo?safe(invoiceNo):'—'}</td><td>${fmt(x.debit)}</td><td>${fmt(x.credit)}</td><td>${fmt(x.balance)}</td></tr>`;
@@ -2311,11 +2313,11 @@ async function returnSubmitRequest(){
 }
 async function returnLoadRequests(){
  const host=$('returnRows');if(!host||!sb)return;host.innerHTML='<tr><td colspan="7">جارٍ التحميل...</td></tr>';
- const {data,error}=await sb.from('sale_return_requests').select('id,sale_id,sale_item_id,quantity,reason,status,created_at,invoice_number,item_name').order('created_at',{ascending:false}).limit(300);
- if(error){host.innerHTML=`<tr><td colspan="7">${esc(error.message)}</td></tr>`;return;}
- host.innerHTML=(data||[]).map(r=>`<tr><td>${new Date(r.created_at).toLocaleString('ar-EG')}</td><td>${esc(r.invoice_number||r.sale_id)}</td><td>${esc(r.item_name||'')}</td><td>${Number(r.quantity).toLocaleString('ar-EG')}</td><td>${esc(r.reason||'')}</td><td>${r.status==='pending'?'بانتظار المدير':r.status==='approved'?'معتمد': 'مرفوض'}</td><td>${role==='admin'&&r.status==='pending'?`<button type="button" onclick="returnApprove('${r.id}')">اعتماد وإرجاع للمخزون</button> <button type="button" class="secondary" onclick="returnReject('${r.id}')">رفض</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="7">لا توجد طلبات مرتجعات.</td></tr>';
+ const {data,error}=await sb.from('sale_return_requests').select('id,sale_id,sale_item_id,quantity,reason,status,created_at,invoice_number,item_name,return_amount,financial_status,financial_posted_at').order('created_at',{ascending:false}).limit(300);
+ if(error){host.innerHTML=`<tr><td colspan="8">${esc(error.message)}</td></tr>`;return;}
+ host.innerHTML=(data||[]).map(r=>{const fin=r.financial_status==='posted'?'تمت إضافة القيمة لرصيد العميل':r.status==='approved'?'بانتظار الترحيل المالي':r.status==='rejected'?'—':'لم يُرحّل بعد';return `<tr><td>${new Date(r.created_at).toLocaleString('ar-EG')}</td><td>${esc(r.invoice_number||r.sale_id)}</td><td>${esc(r.item_name||'')}</td><td>${Number(r.quantity).toLocaleString('ar-EG')}</td><td>${Number(r.return_amount||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2})} ج.م</td><td>${r.status==='pending'?'بانتظار المدير':r.status==='approved'?'معتمد': 'مرفوض'}</td><td>${fin}</td><td>${role==='admin'&&r.status==='pending'?`<button type="button" onclick="returnApprove('${r.id}')">اعتماد المرتجع</button> <button type="button" class="secondary" onclick="returnReject('${r.id}')">رفض</button>`:'—'}</td></tr>`}).join('')||'<tr><td colspan="8">لا توجد طلبات مرتجعات.</td></tr>';
 }
-async function returnApprove(id){if(!confirm('تأكيد اعتماد المرتجع وإضافة الكمية إلى رصيد الصنف؟'))return;const {error}=await sb.rpc('sunshine_approve_sale_return_request',{p_return_id:id});if(error){alert('تعذر الاعتماد: '+error.message);return;}alert('تم اعتماد المرتجع وإعادة الكمية إلى رصيد الصنف.');await returnLoadRequests();}
+async function returnApprove(id){if(!confirm('تأكيد اعتماد المرتجع؟ ستُعاد الكمية إلى المخزون وتُضاف قيمة المرتجع إلى رصيد العميل في كشف الحساب.'))return;const {error}=await sb.rpc('sunshine_approve_sale_return_request',{p_return_id:id});if(error){alert('تعذر الاعتماد: '+error.message);return;}alert('تم اعتماد المرتجع. تم تحديث المخزون وإضافة قيمة المرتجع إلى رصيد العميل.');await returnLoadRequests();if(typeof window.refreshFinancePage==='function')await window.refreshFinancePage();if(typeof window.loadCustomerStatement==='function')await window.loadCustomerStatement();}
 async function returnReject(id){const reason=prompt('اكتب سبب رفض المرتجع:');if(reason===null)return;const {error}=await sb.rpc('sunshine_reject_sale_return_request',{p_return_id:id,p_rejection_reason:reason});if(error){alert('تعذر الرفض: '+error.message);return;}await returnLoadRequests();}
 document.addEventListener('click',e=>{const b=e.target.closest('button[onclick*="openPage(\'returns"]');if(b)setTimeout(()=>{returnLoadSales();returnLoadRequests();},0);});
 </script>

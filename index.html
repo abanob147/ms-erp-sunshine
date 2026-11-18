@@ -1666,30 +1666,49 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
   await window.sunshineRunReports();
  }
  window.sunshineAddExpense=async function(){
-  if(role!=='admin'){alert('إضافة المصروفات متاحة للمدير فقط');return}
-  const expense_date=$('expenseDate').value||todayR(),category=$('expenseCategory').value.trim(),description=$('expenseDescription').value.trim()||null,amount=Number($('expenseAmount').value);
-  if(!category||!Number.isFinite(amount)||amount<=0){$('expenseMsg').textContent='أدخل بند المصروف وقيمة صحيحة أكبر من صفر.';return}
-  const cashBalance=Number(calcBalances().cash||0);
-  if(amount>cashBalance+0.009){$('expenseMsg').textContent='رصيد الخزينة غير كافٍ. الرصيد الحالي: '+money(cashBalance)+' جنيه.';return}
+  const msg=$('expenseMsg'),btn=document.querySelector('button[onclick="sunshineAddExpense()"]');
+  if(role!=='admin'){if(msg)msg.textContent='إضافة المصروفات متاحة للمدير فقط.';return}
+  if(!window.sb){if(msg)msg.textContent='الاتصال بقاعدة البيانات غير متاح. أعد تحميل البرنامج وحاول مرة أخرى.';return}
+  const dateEl=$('expenseDate'),categoryEl=$('expenseCategory'),descriptionEl=$('expenseDescription'),amountEl=$('expenseAmount');
+  const expense_date=dateEl?.value||todayR();
+  const category=categoryEl?.value.trim()||'';
+  const description=descriptionEl?.value.trim()||null;
+  const amount=Number(amountEl?.value);
+  if(!category||!Number.isFinite(amount)||amount<=0){if(msg)msg.textContent='أدخل بند المصروف وقيمة صحيحة أكبر من صفر.';categoryEl?.focus();return}
+  // calcBalances و money معرفتان داخل وحدة الخزينة وليستا global؛ نحسب الرصيد هنا من قاعدة البيانات مباشرة.
+  const {data:cashRows,error:cashReadError}=await sb.from('account_transactions').select('kind,account_type,target_account_type,amount').or('account_type.eq.cash,target_account_type.eq.cash');
+  if(cashReadError){if(msg)msg.textContent='تعذر قراءة رصيد الخزينة: '+cashReadError.message;return}
+  const cashBalance=(cashRows||[]).reduce((balance,t)=>{const n=Number(t.amount||0);if(t.kind==='transfer'){if(t.account_type==='cash')balance-=n;if(t.target_account_type==='cash')balance+=n}else if(t.account_type==='cash'){balance+=(t.kind==='receipt'?n:-n)}return balance},0);
+  const fmtCash=n=>Number(n||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2});
+  if(amount>cashBalance+0.009){if(msg)msg.textContent='رصيد الخزينة غير كافٍ. الرصيد الحالي: '+fmtCash(cashBalance)+' جنيه.';return}
   const expenseText='مصروف تشغيلي: '+category+(description?' — '+description:'');
-  if(!confirm('سيتم تسجيل المصروف التشغيلي وخصم '+money(amount)+' جنيه تلقائياً من الخزينة النقدية.\\n'+expenseText+'\\nالرصيد المتبقي بالخزينة: '+money(cashBalance-amount)+' جنيه. هل تريد المتابعة؟'))return;
-  $('expenseMsg').textContent='جارٍ حفظ المصروف وخصمه من الخزينة...';
-  const {data:{user}}=await sb.auth.getUser();
-  // لا نطلب SELECT بعد INSERT؛ بعض سياسات RLS تسمح بالإضافة ولا تسمح بإرجاع السجل.
-  const {error:expenseError}=await sb.from('operating_expenses').insert({expense_date,category,description,amount,created_by:user?.id||null});
-  if(expenseError){$('expenseMsg').textContent='تعذر حفظ المصروف التشغيلي: '+expenseError.message;return}
-  const {error:cashError}=await sb.from('account_transactions').insert({kind:'payment',account_type:'cash',account_id:null,target_account_type:null,target_account_id:null,amount,customer_id:null,transaction_date:expense_date,description:expenseText,created_by:user?.id||null});
-  if(cashError){
-    // تراجع عن سجل المصروف المطابق إذا تعذر إنشاء سند الصرف.
-    const rollback=await sb.from('operating_expenses').delete().eq('expense_date',expense_date).eq('category',category).eq('amount',amount).eq('created_by',user?.id||null);
-    $('expenseMsg').textContent='تم رفض خصم الخزينة: '+cashError.message+(rollback.error?' — تعذر التراجع التلقائي عن سجل المصروف؛ راجع المدير قبل إعادة المحاولة.':' — تم التراجع عن سجل المصروف ولم يُعتمد.');
-    return;
-  }
-  $('expenseAmount').value='';$('expenseCategory').value='';$('expenseDescription').value='';
-  $('expenseMsg').textContent='تم تسجيل المصروف التشغيلي وخصمه من الخزينة تلقائياً. الرصيد المتبقي: '+money(cashBalance-amount)+' جنيه.';
-  await window.sunshineRunReports();
-  if(role==='admin'&&window.loadAdminProfitDashboard)await window.loadAdminProfitDashboard();
-  if(window.refreshFinancePage)await window.refreshFinancePage();
+  if(!confirm('سيتم تسجيل المصروف وخصم '+fmtCash(amount)+' جنيه تلقائياً من الخزينة النقدية.\\n'+expenseText+'\\nالرصيد المتبقي: '+fmtCash(cashBalance-amount)+' جنيه. هل تريد المتابعة؟'))return;
+  if(btn)btn.disabled=true;
+  if(msg){msg.className='msg';msg.textContent='جارٍ حفظ المصروف وخصمه من الخزينة...'}
+  let expenseSaved=false;
+  try{
+    const {data:{user},error:userError}=await sb.auth.getUser();
+    if(userError)throw userError;
+    const created_by=user?.id||null;
+    const {error:expenseError}=await sb.from('operating_expenses').insert({expense_date,category,description,amount,created_by});
+    if(expenseError)throw new Error('تعذر حفظ سجل المصروفات: '+expenseError.message);
+    expenseSaved=true;
+    const {error:cashError}=await sb.from('account_transactions').insert({kind:'payment',account_type:'cash',account_id:null,target_account_type:null,target_account_id:null,amount,customer_id:null,transaction_date:expense_date,description:expenseText,created_by});
+    if(cashError){
+      let rollbackQuery=sb.from('operating_expenses').delete().eq('expense_date',expense_date).eq('category',category).eq('amount',amount);
+      rollbackQuery=created_by?rollbackQuery.eq('created_by',created_by):rollbackQuery.is('created_by',null);
+      const rollback=await rollbackQuery;
+      expenseSaved=!rollback.error;
+      throw new Error('تعذر خصم المبلغ من الخزينة: '+cashError.message+(rollback.error?' — تعذر التراجع عن سجل المصروف تلقائياً؛ لا تعاود التسجيل قبل مراجعة المدير.':' — تم إلغاء سجل المصروف ولم يتم اعتماد العملية.'));
+    }
+    amountEl.value='';categoryEl.value='';if(descriptionEl)descriptionEl.value='';
+    if(msg){msg.className='msg ok';msg.textContent='تم حفظ المصروف وخصمه من الخزينة بنجاح. الرصيد المتبقي: '+fmtCash(cashBalance-amount)+' جنيه.'}
+    await window.sunshineRunReports();
+    if(role==='admin'&&window.loadAdminProfitDashboard)await window.loadAdminProfitDashboard();
+    if(window.refreshFinancePage)await window.refreshFinancePage();
+  }catch(e){
+    if(msg){msg.className='msg error';msg.textContent=(e?.message||String(e))+(expenseSaved?' — يوجد سجل مصروف محفوظ؛ راجع الحركات قبل إعادة المحاولة.':'')}
+  }finally{if(btn)btn.disabled=false}
  };
  window.sunshineDeleteExpense=async function(id){
   if(role!=='admin'||!confirm('هل تريد حذف هذا المصروف؟'))return;

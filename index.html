@@ -1098,6 +1098,14 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
       <div class="finance-section"><h3>كشف حساب بنك</h3><p class="muted">كشف مستقل لكل حساب بنكي، بالجنيه المصري، مع رصيد افتتاحي ورصيد متحرك وإمكانية الطباعة أو الحفظ PDF.</p>
         <div class="finance-form"><div><label>اختر الحساب البنكي</label><select id="bankStatementAccount"><option value="">-- اختر البنك --</option>${financeBanks.map(b=>`<option value="${safe(b.id)}">${safe(b.bank_name)} — ${safe(b.account_name||'')}</option>`).join('')}</select></div><div><label>من تاريخ</label><input id="bankStatementFrom" type="date"></div><div><label>إلى تاريخ</label><input id="bankStatementTo" type="date"></div></div>
         <div class="finance-actions"><button type="button" onclick="loadBankStatement()">عرض كشف الحساب</button><button type="button" class="secondary" onclick="printBankStatement()">طباعة / حفظ PDF</button></div><p id="bankStatementMsg" class="msg"></p><div id="bankStatementResult"></div></div>
+      <div class="finance-section"><h3>كشف الخزينة النقدية</h3>
+        <p class="muted">يعرض كل ما دخل الخزينة وما تم صرفه منها، مع سبب الصرف والرصيد بعد كل حركة. تصفير الخزينة يتم بتسجيل سند صرف موثق ولا يحذف أي حركة سابقة.</p>
+        <div class="finance-form"><div><label>من تاريخ</label><input id="cashStatementFrom" type="date"></div><div><label>إلى تاريخ</label><input id="cashStatementTo" type="date"></div></div>
+        <div class="finance-actions"><button type="button" onclick="loadCashStatement()">عرض كشف الخزينة</button><button type="button" class="secondary" onclick="printCashStatement()">طباعة / حفظ PDF</button></div>
+        <p id="cashStatementMsg" class="msg"></p><div id="cashStatementResult"></div>
+        ${role==='admin'?`<div class="finance-section" style="border:1px solid #d9e2ec;background:#f8fbff"><h4>خصم جزئي من الخزينة</h4><p>الرصيد المتاح الآن: <b>${money(bal.cash)}</b></p><div class="finance-form"><div><label>مبلغ الخصم</label><input id="cashPartialAmount" type="number" min="0.01" step="0.01" placeholder="اكتب المبلغ المراد خصمه"></div><div><label>سبب الخصم (إلزامي)</label><input id="cashPartialReason" maxlength="500" placeholder="مثال: مصروفات نقل / مشتريات / صيانة"></div><div><label>تاريخ الخصم</label><input id="cashPartialDate" type="date" value="${today()}"></div></div><div class="finance-actions"><button type="button" onclick="deductPartialCash()">حفظ الخصم الجزئي</button></div><p class="muted">سيُسجل الخصم كسند صرف مستقل، ويظهر سببه والمبلغ والرصيد المتبقي في كشف الخزينة دون حذف أي حركة سابقة.</p></div>`:''}
+      ${role==='admin'?`<div class="finance-section" style="border:1px solid #e7c5d5;background:#fffafd"><h4>تصفير رصيد الخزينة بتسجيل المصروف</h4><p>الرصيد المتاح الآن: <b>${money(bal.cash)}</b></p><div class="finance-form"><div><label>المبلغ الذي تم صرفه</label><input id="cashZeroAmount" type="number" min="0.01" step="0.01" value="${Math.max(0,bal.cash).toFixed(2)}"></div><div><label>اتصرفت الفلوس في إيه؟ (البيان إلزامي)</label><input id="cashZeroReason" maxlength="500" placeholder="مثال: مصروفات تشغيل / مشتريات / رواتب"></div><div><label>تاريخ الصرف</label><input id="cashZeroDate" type="date" value="${today()}"></div></div><div class="finance-actions"><button type="button" style="background:#a90d58" onclick="zeroCashboxWithExpense()">تسجيل الصرف وتصفير الخزينة</button></div><p class="muted">سيتم إنشاء سند صرف عادي بالمبلغ والبيان المدخلين، وسيظل ظاهرًا في كشف الخزينة وسجل الحركات والأرشيف عند أرشفته.</p></div>`:''}
+      </div>
       <div class="finance-section"><h3>سجل الحركات المالية</h3>
         ${role==='admin'?`<div class="finance-actions"><button type="button" style="background:#a90d58" onclick="archiveFinancialMovements()">أرشفة جميع الحركات المالية</button><button type="button" class="secondary" onclick="printFinancialMovements()">طباعة الحركات المالية</button><button type="button" class="secondary" onclick="loadFinancialArchive()">عرض الأرشيف</button></div>`:`<div class="finance-actions"><button type="button" class="secondary" onclick="printFinancialMovements()">طباعة الحركات المالية</button></div>`}
         <p class="muted">الأرشفة تحفظ الحركات للرجوع إليها ولا تمسح مديونيات العملاء أو كشوف حساباتهم. بعد الأرشفة تُحسب أرصدة الخزينة والبنوك من الأرصدة الافتتاحية والحركات النشطة فقط.</p>
@@ -1409,6 +1417,60 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
     financeMsg('bankStatementMsg','تم إعداد كشف الحساب.',true);
   };
   window.printBankStatement=function(){const area=el('bankStatementPrintArea');if(!area){financeMsg('bankStatementMsg','اعرض كشف الحساب أولاً.',false);return}const w=window.open('','_blank');if(!w){alert('اسمح بفتح النوافذ المنبثقة للطباعة.');return}w.document.write(`<html dir="rtl"><head><meta charset="utf-8"><title>كشف حساب بنك</title><style>body{font-family:Arial;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #999;padding:8px;text-align:right}h4{margin-bottom:8px}</style></head><body>${area.innerHTML}</body></html>`);w.document.close();w.focus();w.print();};
+  window.loadCashStatement=function(){
+    const from=el('cashStatementFrom')?.value||'',to=el('cashStatementTo')?.value||'',host=el('cashStatementResult');
+    if(!host)return;if(from&&to&&from>to){financeMsg('cashStatementMsg','تاريخ البداية يجب أن يسبق تاريخ النهاية.',false);return}
+    const related=financeTx.filter(t=>(t.account_type==='cash')||(t.kind==='transfer'&&t.target_account_type==='cash'))
+      .sort((a,b)=>String(a.transaction_date||'').localeCompare(String(b.transaction_date||''))||String(a.created_at||'').localeCompare(String(b.created_at||'')));
+    let balance=0,opening=0,totalIn=0,totalOut=0;const rows=[];
+    for(const t of related){let signed=0;const amount=Number(t.amount||0);
+      if(t.kind==='transfer'){if(t.account_type==='cash')signed-=amount;if(t.target_account_type==='cash')signed+=amount}
+      else if(t.account_type==='cash')signed+=(t.kind==='receipt'?1:-1)*amount;
+      if(from&&String(t.transaction_date)<from){balance+=signed;opening=balance;continue}
+      if(to&&String(t.transaction_date)>to)continue;
+      balance+=signed;if(signed>0)totalIn+=signed;if(signed<0)totalOut+=-signed;
+      const kind=t.kind==='transfer'?(signed>0?'تحويل وارد':'تحويل صادر'):(t.kind==='receipt'?'قبض':'صرف');
+      rows.push(`<tr><td>${safe(t.transaction_date||'')}</td><td>${kind}</td><td>${safe(t.description||'—')}</td><td>${signed>0?money(signed):'—'}</td><td>${signed<0?money(-signed):'—'}</td><td>${money(balance)}</td></tr>`);
+    }
+    if(!from)opening=0;
+    host.innerHTML=`<div id="cashStatementPrintArea"><h4>كشف حركة الخزينة النقدية</h4><p>الفترة: ${safe(from||'من بداية السجل')} إلى ${safe(to||'حتى الآن')}</p><div class="finance-stats"><div class="finance-stat"><b>الرصيد السابق</b><strong>${money(opening)}</strong></div><div class="finance-stat"><b>إجمالي المقبوضات والتحويلات الواردة</b><strong>${money(totalIn)}</strong></div><div class="finance-stat"><b>إجمالي المصروفات والتحويلات الصادرة</b><strong>${money(totalOut)}</strong></div><div class="finance-stat"><b>الرصيد الختامي</b><strong>${money(balance)}</strong></div></div><div class="finance-table"><table><thead><tr><th>التاريخ</th><th>نوع الحركة</th><th>بيان الحركة / سبب الصرف</th><th>وارد</th><th>منصرف</th><th>الرصيد بعد الحركة</th></tr></thead><tbody>${rows.join('')||'<tr><td colspan="6">لا توجد حركات خلال الفترة.</td></tr>'}</tbody></table></div></div>`;
+    financeMsg('cashStatementMsg','تم إعداد كشف الخزينة.',true);
+  };
+  window.printCashStatement=function(){const area=el('cashStatementPrintArea');if(!area){financeMsg('cashStatementMsg','اعرض كشف الخزينة أولاً.',false);return}const w=window.open('','_blank');if(!w){alert('اسمح بفتح النوافذ المنبثقة للطباعة.');return}w.document.write(`<html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>كشف الخزينة</title><style>body{font-family:Arial,Tahoma;padding:22px;color:#222}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #999;padding:8px;text-align:right;font-size:12px}h4{text-align:center}</style></head><body><h2 style="text-align:center">صن شاين للاستيراد والتصدير</h2>${area.innerHTML}</body></html>`);w.document.close();w.focus();w.print()};
+  window.deductPartialCash=async function(){
+    if(role!=='admin'){alert('خصم الخزينة متاح للمدير فقط.');return}
+    const amount=Number(el('cashPartialAmount')?.value||0);
+    const description=el('cashPartialReason')?.value.trim()||'';
+    const transaction_date=el('cashPartialDate')?.value||today();
+    const current=calcBalances().cash;
+    if(!Number.isFinite(amount)||amount<=0){alert('أدخل مبلغ خصم صحيحًا أكبر من صفر.');return}
+    if(!description){alert('اكتب سبب الخصم حتى يظهر في كشف الخزينة.');el('cashPartialReason')?.focus();return}
+    if(amount>=current-0.009){alert('هذا الخصم ليس جزئيًا. رصيد الخزينة الحالي '+money(current)+'؛ استخدم قسم تصفير الخزينة إذا كنت تريد صرف الرصيد بالكامل.');return}
+    if(amount>current+0.009){alert('المبلغ أكبر من رصيد الخزينة الحالي ('+money(current)+').');return}
+    const remaining=current-amount;
+    if(!confirm('تأكيد خصم '+money(amount)+' من الخزينة؟\\nالسبب: '+description+'\\nالرصيد المتبقي: '+money(remaining)))return;
+    const {data:{user}}=await sb.auth.getUser();
+    const {error}=await sb.from('account_transactions').insert({kind:'payment',account_type:'cash',account_id:null,target_account_type:null,target_account_id:null,amount,customer_id:null,transaction_date,description,created_by:user?.id||null});
+    if(error){alert('تعذر تسجيل الخصم: '+error.message);return}
+    alert('تم تسجيل الخصم الجزئي بنجاح. الرصيد المتبقي بالخزينة: '+money(remaining));
+    await refreshFinancePage();
+  };
+  window.zeroCashboxWithExpense=async function(){
+    if(role!=='admin'){alert('تصفير الخزينة متاح للمدير فقط.');return}
+    const amount=Number(el('cashZeroAmount')?.value||0),description=el('cashZeroReason')?.value.trim()||'',transaction_date=el('cashZeroDate')?.value||today();
+    const current=calcBalances().cash;
+    if(!Number.isFinite(amount)||amount<=0){alert('لا يوجد مبلغ صحيح لتسجيله.');return}
+    if(!description){alert('اكتب سبب صرف المبلغ حتى يظهر بوضوح في كشف الخزينة.');el('cashZeroReason')?.focus();return}
+    if(amount>current+0.009){alert('المبلغ أكبر من رصيد الخزينة الحالي ('+money(current)+').');return}
+    const remaining=current-amount;
+    const confirmText=amount>=current-0.009?'سيتم تسجيل سند صرف بقيمة '+money(amount)+' بالبيان: '+description+'، وسيصبح رصيد الخزينة صفراً. لن تُحذف الحركات السابقة. هل تريد المتابعة؟':'سيتم تسجيل سند صرف بقيمة '+money(amount)+' بالبيان: '+description+'، وسيكون المتبقي بالخزينة '+money(remaining)+'. هل تريد المتابعة؟';
+    if(!confirm(confirmText))return;
+    const {data:{user}}=await sb.auth.getUser();
+    const {error}=await sb.from('account_transactions').insert({kind:'payment',account_type:'cash',account_id:null,target_account_type:null,target_account_id:null,amount,customer_id:null,transaction_date,description,created_by:user?.id||null});
+    if(error){alert('تعذر تسجيل الصرف: '+error.message);return}
+    alert(amount>=current-0.009?'تم تسجيل المصروف وتصفير رصيد الخزينة بنجاح.':'تم تسجيل المصروف بنجاح.');
+    await refreshFinancePage();
+  };
   window.showFinanceSuccess=function(kind){
     const title=kind==='receipt'?'تم القبض بنجاح':'تم الصرف بنجاح';
     const old=document.getElementById('financeSuccessOverlay');if(old)old.remove();
@@ -1607,13 +1669,25 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
   if(role!=='admin'){alert('إضافة المصروفات متاحة للمدير فقط');return}
   const expense_date=$('expenseDate').value||todayR(),category=$('expenseCategory').value.trim(),description=$('expenseDescription').value.trim()||null,amount=Number($('expenseAmount').value);
   if(!category||!Number.isFinite(amount)||amount<=0){$('expenseMsg').textContent='أدخل بند المصروف وقيمة صحيحة أكبر من صفر.';return}
-  $('expenseMsg').textContent='جارٍ حفظ المصروف...';
+  const cashBalance=Number(calcBalances().cash||0);
+  if(amount>cashBalance+0.009){$('expenseMsg').textContent='رصيد الخزينة غير كافٍ. الرصيد الحالي: '+money(cashBalance)+' جنيه.';return}
+  const expenseText='مصروف تشغيلي: '+category+(description?' — '+description:'');
+  if(!confirm('سيتم تسجيل المصروف التشغيلي وخصم '+money(amount)+' جنيه تلقائياً من الخزينة النقدية.\\n'+expenseText+'\\nالرصيد المتبقي بالخزينة: '+money(cashBalance-amount)+' جنيه. هل تريد المتابعة؟'))return;
+  $('expenseMsg').textContent='جارٍ حفظ المصروف وخصمه من الخزينة...';
   const {data:{user}}=await sb.auth.getUser();
-  const {error}=await sb.from('operating_expenses').insert({expense_date,category,description,amount,created_by:user?.id||null});
-  if(error){$('expenseMsg').textContent='تعذر حفظ المصروف: '+error.message;return}
+  const {data:expenseRow,error:expenseError}=await sb.from('operating_expenses').insert({expense_date,category,description,amount,created_by:user?.id||null}).select('id').single();
+  if(expenseError){$('expenseMsg').textContent='تعذر حفظ المصروف: '+expenseError.message;return}
+  const {error:cashError}=await sb.from('account_transactions').insert({kind:'payment',account_type:'cash',account_id:null,target_account_type:null,target_account_id:null,amount,customer_id:null,transaction_date:expense_date,description:expenseText,created_by:user?.id||null});
+  if(cashError){
+    const {error:rollbackError}=await sb.from('operating_expenses').delete().eq('id',expenseRow.id);
+    $('expenseMsg').textContent='تعذر خصم المصروف من الخزينة: '+cashError.message+(rollbackError?' — وتعذر التراجع التلقائي عن سجل المصروف، يرجى مراجعة المدير.':' — لم يتم اعتماد المصروف.');
+    return;
+  }
   $('expenseAmount').value='';$('expenseCategory').value='';$('expenseDescription').value='';
-  $('expenseMsg').textContent='تم حفظ المصروف وسيُخصم من صافي الربح.';
-  await window.sunshineRunReports();if(role==='admin'&&window.loadAdminProfitDashboard)await window.loadAdminProfitDashboard();
+  $('expenseMsg').textContent='تم تسجيل المصروف التشغيلي وخصمه من الخزينة تلقائياً. الرصيد المتبقي: '+money(cashBalance-amount)+' جنيه.';
+  await window.sunshineRunReports();
+  if(role==='admin'&&window.loadAdminProfitDashboard)await window.loadAdminProfitDashboard();
+  if(window.refreshFinancePage)await window.refreshFinancePage();
  };
  window.sunshineDeleteExpense=async function(id){
   if(role!=='admin'||!confirm('هل تريد حذف هذا المصروف؟'))return;

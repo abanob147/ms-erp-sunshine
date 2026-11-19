@@ -2044,6 +2044,7 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
     'items','customers','sales','sale_items','customer_transactions',
     'account_transactions','bank_accounts','company_checks','company_settings',
     'import_shipments','purchases','purchase_items','supplier_ledger',
+    'purchase_return_requests','stock_movements',
     'suppliers','operating_expenses','accounts','sale_return_requests','sales_reps','sales_rep_collection_receipts'
   ];
   const $rt=id=>document.getElementById(id);
@@ -2054,7 +2055,7 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
   }
   function currentPage(){
     const title=$rt('pageTitle')?.textContent?.trim()||'';
-    const map={'لوحة التحكم':'dashboard','الأصناف والمخزون':'items','شحنات الاستيراد':'shipments','المبيعات':'sales','العملاء':'customers','المشتريات':'purchases','الموردون':'suppliers','شؤون الموظفين':'hr','الحسابات والخزينة':'accounts','الشيكات':'checks','التقارير':'reports','مرتجعات المبيعات':'returns','إعدادات المدير':'settings','أرقام الحسابات':'bank-directory','تحصيلات المندوبين':'rep-collections'};
+    const map={'لوحة التحكم':'dashboard','الأصناف والمخزون':'items','شحنات الاستيراد':'shipments','المبيعات':'sales','العملاء':'customers','المشتريات':'purchases','الموردون':'suppliers','شؤون الموظفين':'hr','الحسابات والخزينة':'accounts','الشيكات':'checks','التقارير':'reports','مرتجعات المبيعات':'returns','مرتجعات المشتريات':'purchase-returns','إعدادات المدير':'settings','أرقام الحسابات':'bank-directory','تحصيلات المندوبين':'rep-collections'};
     return map[title]||'dashboard';
   }
   function userIsEditing(){
@@ -2101,6 +2102,8 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
         else if(window.openPage)window.openPage('checks',null);
       }else if(page==='purchases'){
         if(window.purchaseLoad)await window.purchaseLoad();
+      }else if(page==='purchase-returns'){
+        if(window.sunshinePurchaseReturnLoad)await window.sunshinePurchaseReturnLoad();
       }else if(page==='suppliers'){
         if(window.loadSuppliers)await window.loadSuppliers();
       }else if(page==='hr'){
@@ -2385,7 +2388,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('button[onclick*=
   if(id!=='purchase-returns')return priorOpen.call(this,id,btn);
   if(!sb){alert('اتصال قاعدة البيانات غير متاح.');return}
   document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');
-  ['dashboard','items','shipments','sales','customers'].forEach(k=>document.getElementById(k)?.classList.add('hidden'));
+  ['dashboard','items','warehouses','shipments','sales','returns','customers','sales-reps','rep-collections','placeholder'].forEach(k=>document.getElementById(k)?.classList.add('hidden'));
   const ph=document.getElementById('placeholder');ph.classList.remove('hidden');ph.classList.add('finance-page');
   document.getElementById('pageTitle').textContent='مرتجعات المشتريات';ph.innerHTML=pageHtml();sunshinePurchaseReturnLoad();
  };

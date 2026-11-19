@@ -1351,7 +1351,7 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
     }).join('')||'<tr><td colspan="6">لا توجد حركات خلال الفترة المحددة.</td></tr>';
     el('statementRows').innerHTML=body;
     el('statementSummary').innerHTML=`<div class="finance-stat"><b>الرصيد السابق</b><strong>${fmt(opening)} جنيه</strong></div><div class="finance-stat"><b>إجمالي المدين</b><strong>${fmt(totalDebit)} جنيه</strong></div><div class="finance-stat"><b>إجمالي الدائن</b><strong>${fmt(totalCredit)} جنيه</strong></div><div class="finance-stat"><b>الرصيد النهائي</b><strong>${fmt(balance)} جنيه</strong></div>`;
-    el('statementPrintMeta').textContent='العميل: '+customer.name+' | الفترة: '+(from||'من البداية')+' إلى '+(to||'حتى الآن');
+    el('statementPrintMeta').innerHTML='<div class="statement-customer-name">اسم العميل: '+safe(customer.name)+'</div><div class="statement-period">الفترة: '+safe(from||'من البداية')+' إلى '+safe(to||'حتى الآن')+'</div>';
     el('statementPrintFooter').textContent='الرصيد مدين إذا كان موجباً، ودائن إذا كان سالباً. جميع القيم بالجنيه المصري.';
     el('customerStatementPrint').classList.remove('hidden');
     currentCustomerStatement={customer,from,to,opening,totalDebit,totalCredit,balance,rows};
@@ -1372,21 +1372,23 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
       body{font-size:10pt;line-height:1.4}
       #customerStatementPrint{display:block!important;position:static!important;visibility:visible!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;background:#fff!important;color:#111!important;overflow:visible!important}
       .invoice-head{display:flex!important;justify-content:space-between!important;align-items:flex-start!important;gap:12px!important;border-bottom:2px solid #a80d55!important;padding:0 0 8px!important;margin:0 0 10px!important;break-inside:avoid;page-break-inside:avoid}
-      .invoice-head h2{font-size:17pt!important;margin:0 0 4px!important;color:#9d1456!important}
-      .invoice-head b{font-size:11pt!important}
-      #statementPrintMeta{font-size:9pt!important;text-align:left!important;max-width:48%!important}
+      .invoice-head h2{font-size:25pt!important;font-weight:900!important;margin:0 0 7px!important;color:#9d1456!important;text-shadow:0 0 0 #9d1456!important}
+      .invoice-head b{font-size:17pt!important;font-weight:900!important}
+      #statementPrintMeta{font-size:14pt!important;text-align:left!important;max-width:58%!important;font-weight:900!important;color:#000!important;line-height:1.8!important}
+      #statementPrintMeta .statement-customer-name{font-size:28pt!important;font-weight:900!important;line-height:1.45!important;color:#000!important;white-space:normal!important;margin-bottom:8px!important;text-align:right!important}
+      #statementPrintMeta .statement-period{font-size:13pt!important;font-weight:900!important;color:#000!important}
       .finance-stats,#statementSummary{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:5px!important;margin:8px 0 12px!important;break-inside:avoid;page-break-inside:avoid}
       .finance-stat{border:1px solid #bbb!important;border-radius:5px!important;padding:6px 4px!important;text-align:center!important;min-width:0!important;background:#fff!important;break-inside:avoid;page-break-inside:avoid}
-      .finance-stat b{display:block!important;font-size:8pt!important;margin-bottom:4px!important}
-      .finance-stat strong{display:block!important;font-size:10pt!important;white-space:normal!important}
+      .finance-stat b{display:block!important;font-size:10pt!important;font-weight:900!important;margin-bottom:5px!important;color:#000!important}
+      .finance-stat strong{display:block!important;font-size:13pt!important;font-weight:900!important;white-space:normal!important;color:#000!important}
       .finance-table{display:block!important;width:100%!important;overflow:visible!important;margin:0!important;break-before:auto!important;page-break-before:auto!important}
       table{width:100%!important;min-width:0!important;border-collapse:collapse!important;table-layout:fixed!important;margin:0!important}
       thead{display:table-header-group!important}
       tr{break-inside:avoid!important;page-break-inside:avoid!important}
-      th,td{border:1px solid #777!important;padding:5px 4px!important;color:#111!important;font-size:8pt!important;text-align:center!important;vertical-align:middle!important;overflow-wrap:anywhere!important}
-      th{background:#eee!important;font-weight:700!important}
+      th,td{border:1px solid #777!important;padding:5px 4px!important;color:#111!important;font-size:10pt!important;font-weight:900!important;text-align:center!important;vertical-align:middle!important;overflow-wrap:anywhere!important}
+      th{background:#eee!important;font-weight:900!important;font-size:11pt!important}
       th:nth-child(1){width:13%}th:nth-child(2){width:35%}th:nth-child(3){width:16%}th:nth-child(4),th:nth-child(5),th:nth-child(6){width:12%}
-      #statementPrintFooter{font-size:8pt!important;margin:8px 0 0!important;color:#444!important;break-inside:avoid;page-break-inside:avoid}
+      #statementPrintFooter{font-size:10pt!important;font-weight:800!important;margin:8px 0 0!important;color:#444!important;break-inside:avoid;page-break-inside:avoid}
       @media screen{body{padding:12mm}.print-hint{display:block;color:#555;text-align:center;margin:0 0 10px;font-size:9pt}}
       @media print{.print-hint{display:none!important}}
     </style></head><body><div class="print-hint">كشف حساب عميل — صن شاين للاستيراد والتصدير</div><div id="customerStatementPrint">${content}</div><script>window.addEventListener('load',()=>setTimeout(()=>{window.focus();window.print()},300));<\/script></body></html>`);

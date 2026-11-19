@@ -158,7 +158,7 @@ body:has(#login:not(.hidden)) .wrap{position:fixed!important;inset:0!important;z
 <div><label>الكمية المرتجعة</label><input id="returnQty" type="number" min="0.001" step="0.001"></div>
 <div><label>سبب المرتجع</label><input id="returnReason" placeholder="اكتب سبب المرتجع"></div>
 </div><div class="invoice-actions"><button type="button" onclick="returnSubmitRequest()">إرسال طلب للمدير</button><button type="button" class="secondary" onclick="returnLoadSales()">تحديث الفواتير</button></div><p id="returnMsg" class="msg"></p></div>
-<div class="finance-section"><h4>طلبات المرتجعات</h4><div class="scroll"><table><thead><tr><th>التاريخ</th><th>الفاتورة</th><th>الصنف</th><th>الكمية</th><th>قيمة المرتجع</th><th>حالة الطلب</th><th>حالة رصيد العميل</th><th>الإجراء</th></tr></thead><tbody id="returnRows"><tr><td colspan="8">جارٍ التحميل...</td></tr></tbody></table></div></div>
+<div class="finance-section"><div class="invoice-actions no-print" style="justify-content:space-between;align-items:center"><h4 style="margin:0">طلبات المرتجعات</h4><button type="button" class="secondary" onclick="printSaleReturnsA4()">طباعة A4</button></div><div class="scroll"><table><thead><tr><th>التاريخ</th><th>الفاتورة</th><th>الصنف</th><th>الكمية</th><th>قيمة المرتجع</th><th>حالة الطلب</th><th>حالة رصيد العميل</th><th>الإجراء</th></tr></thead><tbody id="returnRows"><tr><td colspan="8">جارٍ التحميل...</td></tr></tbody></table></div></div>
 <p class="muted">ملاحظة: تنفيذ التسوية المالية يتطلب تشغيل تحديث SQL الخاص بالمرتجعات في Supabase أولًا. قيمة المرتجع تُسجل كرصيد دائن للعميل ولا تُصرف نقدًا من الخزينة تلقائيًا.</p>
 </div><div id="placeholder" class="card hidden"><h3 id="placeholderTitle"></h3><p class="muted">هذه الوحدة في مرحلة التوصيل بقاعدة البيانات.</p></div></main></div></section></div>
 <script>
@@ -2369,11 +2369,28 @@ async function returnSubmitRequest(){
  catch(e){$('returnMsg').textContent='تعذر تسجيل الطلب: '+(e.message||e);}
  finally{if(btn)btn.disabled=false;}
 }
+async function printSaleReturnsA4(){
+ if(!sb){alert('يرجى تسجيل الدخول أولاً.');return;}
+ const {data,error}=await sb.from('sale_return_requests').select('id,sale_id,quantity,reason,status,created_at,invoice_number,item_name,return_amount,financial_status').order('created_at',{ascending:false}).limit(1000);
+ if(error){alert('تعذر تجهيز كشف المرتجعات للطباعة: '+error.message);return;}
+ const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const status=r=>r.status==='pending'?'بانتظار المدير':r.status==='approved'?'معتمد':'مرفوض';
+ const financial=r=>r.financial_status==='posted'?'تمت إضافة القيمة لرصيد العميل':r.status==='approved'?'بانتظار الترحيل المالي':r.status==='rejected'?'—':'لم يُرحّل بعد';
+ const rows=(data||[]).map((r,i)=>`<tr><td>${i+1}</td><td>${new Date(r.created_at).toLocaleString('ar-EG')}</td><td>${safe(r.invoice_number||r.sale_id)}</td><td>${safe(r.item_name||'')}</td><td>${Number(r.quantity||0).toLocaleString('ar-EG')}</td><td>${Number(r.return_amount||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2})} ج.م</td><td>${status(r)}</td><td>${financial(r)}</td><td>${safe(r.reason||'')}</td></tr>`).join('');
+ const w=window.open('','_blank','width=1100,height=800');
+ if(!w){alert('يرجى السماح بفتح النوافذ المنبثقة حتى تتم الطباعة.');return;}
+ w.document.open();
+ w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>كشف مرتجعات المبيعات</title><style>
+ @page{size:A4 landscape;margin:10mm}*{box-sizing:border-box}body{font-family:Arial,Tahoma,sans-serif;color:#111;margin:0;padding:12px}h2,h3{text-align:center;margin:5px 0}h2{font-size:20px}h3{font-size:16px}.meta{display:flex;justify-content:space-between;margin:14px 0 8px;font-size:11px}table{width:100%;border-collapse:collapse;table-layout:auto}th,td{border:1px solid #555;padding:6px 5px;text-align:center;font-size:10px;vertical-align:middle}th{background:#eee;font-weight:700}td:last-child{text-align:right}.foot{margin-top:12px;font-size:10px;text-align:left}@media print{button{display:none}}
+ </style></head><body><h2>صن شاين للاستيراد والتصدير</h2><h3>كشف مرتجعات المبيعات</h3><div class="meta"><span>تاريخ الطباعة: ${new Date().toLocaleString('ar-EG')}</span><span>عدد الطلبات: ${(data||[]).length}</span></div><table><thead><tr><th>م</th><th>التاريخ</th><th>رقم الفاتورة</th><th>الصنف</th><th>الكمية</th><th>قيمة المرتجع</th><th>الحالة</th><th>حالة رصيد العميل</th><th>سبب المرتجع</th></tr></thead><tbody>${rows||'<tr><td colspan="9">لا توجد طلبات مرتجعات</td></tr>'}</tbody></table><div class="foot">صن شاين للاستيراد والتصدير</div><script>window.onload=()=>setTimeout(()=>{window.focus();window.print()},300)<\/script></body></html>`);
+ w.document.close();
+}
+
 async function returnLoadRequests(){
  const host=$('returnRows');if(!host||!sb)return;host.innerHTML='<tr><td colspan="8">جارٍ التحميل...</td></tr>';
  const {data,error}=await sb.from('sale_return_requests').select('id,sale_id,sale_item_id,quantity,reason,status,created_at,invoice_number,item_name,return_amount,financial_status,financial_posted_at').order('created_at',{ascending:false}).limit(300);
  if(error){host.innerHTML=`<tr><td colspan="8">${esc(error.message)}</td></tr>`;return;}
- host.innerHTML=(data||[]).map(r=>{const fin=r.financial_status==='posted'?'تمت إضافة القيمة لرصيد العميل':r.status==='approved'?'بانتظار الترحيل المالي':r.status==='rejected'?'—':'لم يُرحّل بعد';const actions=role==='admin'?(r.status==='pending'?`<button type="button" onclick="returnApprove('${r.id}')">اعتماد المرتجع</button> <button type="button" class="secondary" onclick="returnReject('${r.id}')">رفض</button> <button type="button" class="secondary" onclick="returnEditRequest('${r.id}',${Number(r.quantity)},${JSON.stringify(String(r.reason||''))})">تعديل</button> <button type="button" style="background:#a11" onclick="returnDeleteRequest('${r.id}','${String(r.status)}')">مسح</button>`:r.status==='rejected'?`<button type="button" class="secondary" onclick="returnEditRequest('${r.id}',${Number(r.quantity)},${JSON.stringify(String(r.reason||''))})">تعديل</button> <button type="button" style="background:#a11" onclick="returnDeleteRequest('${r.id}','${String(r.status)}')">مسح</button>`:'تم الترحيل — لا يمكن التعديل أو المسح'):'—';return `<tr><td>${new Date(r.created_at).toLocaleString('ar-EG')}</td><td>${esc(r.invoice_number||r.sale_id)}</td><td>${esc(r.item_name||'')}</td><td>${Number(r.quantity).toLocaleString('ar-EG')}</td><td>${Number(r.return_amount||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2})} ج.م</td><td>${r.status==='pending'?'بانتظار المدير':r.status==='approved'?'معتمد': 'مرفوض'}</td><td>${fin}</td><td>${actions}</td></tr>`}).join('')||'<tr><td colspan="8">لا توجد طلبات مرتجعات.</td></tr>';
+ host.innerHTML=(data||[]).map(r=>{const fin=r.financial_status==='posted'?'تمت إضافة القيمة لرصيد العميل':r.status==='approved'?'بانتظار الترحيل المالي':r.status==='rejected'?'—':'لم يُرحّل بعد';const actions=role==='admin'?(r.status==='pending'?`<button type="button" onclick="returnApprove('${r.id}')">اعتماد المرتجع</button> <button type="button" class="secondary" onclick="returnReject('${r.id}')">رفض</button> <button type="button" class="secondary" onclick="returnEditRequest('${r.id}',${Number(r.quantity)},${JSON.stringify(String(r.reason||''))})">تعديل</button> <button type="button" style="background:#a11" onclick="returnDeleteRequest('${r.id}','${String(r.status)}')">مسح</button>`:r.status==='rejected'?`<button type="button" class="secondary" onclick="returnEditRequest('${r.id}',${Number(r.quantity)},${JSON.stringify(String(r.reason||''))})">تعديل</button> <button type="button" style="background:#a11" onclick="returnDeleteRequest('${r.id}','${String(r.status)}')">مسح</button>`:r.status==='approved'?`<button type="button" style="background:#a11" onclick="returnDeleteRequest('${r.id}','approved')">مسح سجل المرتجع</button>`:'—'):'—';return `<tr><td>${new Date(r.created_at).toLocaleString('ar-EG')}</td><td>${esc(r.invoice_number||r.sale_id)}</td><td>${esc(r.item_name||'')}</td><td>${Number(r.quantity).toLocaleString('ar-EG')}</td><td>${Number(r.return_amount||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2})} ج.م</td><td>${r.status==='pending'?'بانتظار المدير':r.status==='approved'?'معتمد': 'مرفوض'}</td><td>${fin}</td><td>${actions}</td></tr>`}).join('')||'<tr><td colspan="8">لا توجد طلبات مرتجعات.</td></tr>';
 }
 async function returnEditRequest(id,currentQty,currentReason){
  if(role!=='admin'){alert('تعديل طلبات المرتجعات متاح للمدير فقط.');return;}
@@ -2387,11 +2404,40 @@ async function returnEditRequest(id,currentQty,currentReason){
 }
 async function returnDeleteRequest(id,status){
  if(role!=='admin'){alert('مسح طلبات المرتجعات متاح للمدير فقط.');return;}
- if(status==='approved'){alert('لا يمكن مسح مرتجع معتمد لأنه قد أثّر بالفعل على المخزون أو رصيد العميل.');return;}
- if(!['pending','rejected'].includes(status)){alert('حالة الطلب لا تسمح بالمسح.');return;}
- if(!confirm('تأكيد مسح طلب المرتجع من القائمة؟ سيتم حذف سجل الطلب فقط دون أي تعديل على المخزون أو رصيد العميل أو الخزينة.'))return;
- try{const {error}=await sb.from('sale_return_requests').delete().eq('id',id).in('status',['pending','rejected']);if(error)throw error;alert('تم مسح سجل طلب المرتجع فقط. لم يتغير المخزون أو رصيد العميل أو الخزينة.');await returnLoadRequests();}
- catch(e){alert('تعذر مسح الطلب. قد تمنع قاعدة البيانات الحذف بسبب ارتباط السجل بحركات أخرى: '+(e.message||e));}
+ if(!['pending','rejected','approved'].includes(status)){alert('حالة الطلب لا تسمح بالمسح.');return;}
+ const approved=status==='approved';
+ const message=approved
+  ?'تأكيد مسح سجل طلب المرتجع المعتمد؟\n\nسيتم حذف سجل الطلب من قائمة المرتجعات فقط. لن يتم إرجاع أو خصم أي كمية من المخزن، ولن يتم حذف أو تعديل أي مبلغ أو حركة في كشف حساب العميل أو الخزينة.'
+  :'تأكيد مسح طلب المرتجع؟ سيتم حذف سجل الطلب فقط دون أي تعديل على المخزون أو رصيد العميل أو الخزينة.';
+ if(!confirm(message))return;
+ let detachedLedgerLinks=false;
+ try{
+  // For an approved return, preserve the customer-ledger transaction itself.
+  // Detach only its optional reference to the request before deleting the request row,
+  // preventing a foreign-key cascade from deleting the financial transaction.
+  if(approved){
+   const {data:linkedRows,error:selectLinkError}=await sb.from('customer_transactions').select('id').eq('return_request_id',id);
+   if(selectLinkError)throw new Error('تعذر فحص ارتباطات كشف حساب العميل، لذلك لم يتم حذف الطلب: '+selectLinkError.message);
+   window._sunshineReturnLedgerLinkIds=(linkedRows||[]).map(x=>x.id);
+   if(window._sunshineReturnLedgerLinkIds.length){
+    const {error:linkError}=await sb.from('customer_transactions').update({return_request_id:null}).in('id',window._sunshineReturnLedgerLinkIds);
+    if(linkError)throw new Error('تعذر حماية حركة كشف حساب العميل قبل المسح، لذلك لم يتم حذف الطلب: '+linkError.message);
+    detachedLedgerLinks=true;
+   }
+  }
+  const {error}=await sb.from('sale_return_requests').delete().eq('id',id).eq('status',status);
+  if(error){
+   if(detachedLedgerLinks){
+    const {error:restoreError}=await sb.from('customer_transactions').update({return_request_id:id}).in('id',window._sunshineReturnLedgerLinkIds||[]);
+    if(restoreError)throw new Error('فشل حذف الطلب، وتعذر إعادة ربط مرجع حركة كشف الحساب تلقائيًا. حركة العميل نفسها لم تُحذف. تفاصيل الاستعادة: '+restoreError.message+' | خطأ الحذف: '+error.message);
+   }
+   throw error;
+  }
+  alert(approved
+   ?'تم مسح سجل طلب المرتجع المعتمد فقط. المخزون وكشف حساب العميل والخزينة لم تتغير، وحركة العميل المالية ما زالت محفوظة.'
+   :'تم مسح سجل طلب المرتجع فقط. لم يتغير المخزون أو رصيد العميل أو الخزينة.');
+  await returnLoadRequests();
+ }catch(e){alert('تعذر مسح الطلب: '+(e.message||e));}
 }
 async function returnApprove(id){
  if(role!=='admin'){alert('اعتماد مرتجعات المبيعات متاح للمدير فقط.');return}
@@ -2407,7 +2453,20 @@ async function returnReject(id){
  try{const {error}=await sb.rpc('sunshine_reject_sale_return_request',{p_return_id:id,p_rejection_reason:reason});if(error)throw error;await returnLoadRequests();}
  catch(e){alert('تعذر رفض المرتجع: '+(e.message||e));}
 }
-document.addEventListener('click',e=>{const b=e.target.closest('button[onclick*="openPage(\'returns"]');if(b)setTimeout(()=>{returnLoadSales();returnLoadRequests();},0);});
+// إتاحة وظائف صفحة المرتجعات صراحةً على window لضمان عملها عند فتح الصفحة من القائمة.
+window.returnLoadSales=returnLoadSales;
+window.returnLoadLines=returnLoadLines;
+window.returnSubmitRequest=returnSubmitRequest;
+window.returnLoadRequests=returnLoadRequests;
+window.returnEditRequest=returnEditRequest;
+window.returnDeleteRequest=returnDeleteRequest;
+window.returnApprove=returnApprove;
+window.returnReject=returnReject;
+// تحديث القوائم عند فتح صفحة المرتجعات، مع إعادة المحاولة بعد إظهار عناصر الصفحة.
+document.addEventListener('click',e=>{
+ const b=e.target.closest('button[onclick*="openPage(\'returns"]');
+ if(b)setTimeout(()=>{window.returnLoadSales();window.returnLoadRequests();},80);
+});
 </script>
 
 <script>

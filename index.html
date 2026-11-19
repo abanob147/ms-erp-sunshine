@@ -1656,9 +1656,11 @@ $('invDate').value=new Date().toISOString().slice(0,10);connect();
   body.print-customer-statement *{visibility:hidden!important}
   body.print-customer-statement #invoicePrint,body.print-customer-statement #invoicePrint *{visibility:hidden!important}
   body.print-customer-statement #customerStatementPrint,body.print-customer-statement #customerStatementPrint *{visibility:visible!important}
-  body.print-customer-statement #customerStatementPrint{display:block!important;position:absolute!important;top:0!important;right:0!important;width:100%!important;background:#fff!important;color:#000!important}
+  body.print-customer-statement #customerStatementPrint{display:block!important;position:absolute!important;top:0!important;right:0!important;width:100%!important;background:#fff!important;color:#000!important;font-weight:700!important}
+  body.print-customer-statement #statementPrintMeta{font-size:20px!important;font-weight:900!important;line-height:1.8!important;color:#000!important;margin-top:10px!important}
+  body.print-customer-statement #customerStatementPrint .finance-stat b,body.print-customer-statement #customerStatementPrint .finance-stat strong{font-weight:900!important}
   body.print-customer-statement #customerStatementPrint table{min-width:0!important;width:100%!important}
-  body.print-customer-statement #customerStatementPrint th,body.print-customer-statement #customerStatementPrint td{border:1px solid #777!important;color:#000!important}
+  body.print-customer-statement #customerStatementPrint th,body.print-customer-statement #customerStatementPrint td{border:1px solid #555!important;color:#000!important;font-weight:700!important}
 }
 </style>
 

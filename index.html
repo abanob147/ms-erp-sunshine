@@ -2323,4 +2323,73 @@ async function returnApprove(id){if(!confirm('تأكيد اعتماد المرت
 async function returnReject(id){const reason=prompt('اكتب سبب رفض المرتجع:');if(reason===null)return;const {error}=await sb.rpc('sunshine_reject_sale_return_request',{p_return_id:id,p_rejection_reason:reason});if(error){alert('تعذر الرفض: '+error.message);return;}await returnLoadRequests();}
 document.addEventListener('click',e=>{const b=e.target.closest('button[onclick*="openPage(\'returns"]');if(b)setTimeout(()=>{returnLoadSales();returnLoadRequests();},0);});
 </script>
+
+<script>
+/* Sunshine ERP - Purchase Returns module */
+(function(){
+ const priorOpen=window.openPage;
+ const $r=id=>document.getElementById(id);
+ const escR=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const fmtR=v=>Number(v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+ function pageHtml(){return `<h3>مرتجعات المشتريات</h3>
+ <p class="muted">اختر صنفًا من فاتورة شراء أصلية. الطلب لا يخصم المخزون قبل اعتماد المدير. عند الاعتماد تُخصم الكمية وقيمة المرتجع من إجمالي فاتورة الشراء ويُسجل إشعار دائن في كشف المورد مرة واحدة.</p>
+ <div class="finance-section"><h4>إنشاء طلب مرتجع مشتريات</h4><div class="grid">
+ <div><label>فاتورة المشتريات</label><select id="prPurchase" onchange="sunshinePurchaseReturnLoadLines()"><option value="">جارٍ تحميل الفواتير...</option></select></div>
+ <div><label>الصنف من الفاتورة</label><select id="prLine"><option value="">اختر الفاتورة أولاً</option></select></div>
+ <div><label>الكمية المرتجعة</label><input id="prQty" type="number" min="0.001" step="0.001"></div>
+ <div><label>سبب المرتجع</label><input id="prReason" placeholder="اكتب سبب المرتجع"></div>
+ </div><div class="invoice-actions"><button type="button" onclick="sunshinePurchaseReturnSubmit()">إرسال طلب للمدير</button><button type="button" class="secondary" onclick="sunshinePurchaseReturnLoad()">تحديث</button></div><p id="prMsg" class="msg"></p></div>
+ <div class="finance-section"><h4>طلبات مرتجعات المشتريات</h4><div class="finance-table"><table><thead><tr><th>التاريخ</th><th>فاتورة الشراء</th><th>المورد</th><th>الصنف</th><th>الكمية</th><th>قيمة المرتجع</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody id="prRows"><tr><td colspan="8">جارٍ التحميل...</td></tr></tbody></table></div></div>`}
+ window.sunshinePurchaseReturnLoad=async function(){
+  if(!window.sb)return;
+  const sel=$r('prPurchase'),host=$r('prRows'); if(!sel||!host)return;
+  const [inv,req]=await Promise.all([
+   sb.from('purchases').select('id,invoice_number,purchase_date,supplier_id,currency,total_amount').order('purchase_date',{ascending:false}).limit(500),
+   sb.from('purchase_return_requests').select('id,purchase_id,purchase_item_id,quantity,reason,status,created_at,invoice_number,supplier_name,item_name,return_amount,currency').order('created_at',{ascending:false}).limit(500)
+  ]);
+  if(inv.error){$r('prMsg').textContent='تعذر تحميل فواتير الشراء: '+inv.error.message;return}
+  if(req.error){host.innerHTML=`<tr><td colspan="8">تعذر تحميل الطلبات: ${escR(req.error.message)}. شغّل SQL الخاص بمرتجعات المشتريات أولاً.</td></tr>`;return}
+  window._sunPurchaseReturnInvoices=inv.data||[];
+  sel.innerHTML='<option value="">اختر فاتورة الشراء</option>'+window._sunPurchaseReturnInvoices.map(x=>`<option value="${x.id}">${escR(x.invoice_number)} — ${escR(x.purchase_date)} — ${fmtR(x.total_amount)} ${escR(x.currency||'EGP')}</option>`).join('');
+  host.innerHTML=(req.data||[]).map(x=>`<tr><td>${new Date(x.created_at).toLocaleString('ar-EG')}</td><td>${escR(x.invoice_number||x.purchase_id)}</td><td>${escR(x.supplier_name||'')}</td><td>${escR(x.item_name||'')}</td><td>${fmtR(x.quantity)}</td><td>${fmtR(x.return_amount)} ${escR(x.currency||'EGP')}</td><td>${x.status==='pending'?'بانتظار المدير':x.status==='approved'?'معتمد':x.status==='rejected'?'مرفوض':'—'}</td><td>${role==='admin'&&x.status==='pending'?`<button type="button" onclick="sunshinePurchaseReturnApprove('${x.id}')">اعتماد</button> <button type="button" class="secondary" onclick="sunshinePurchaseReturnReject('${x.id}')">رفض</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="8">لا توجد طلبات مرتجعات.</td></tr>';
+ };
+ window.sunshinePurchaseReturnLoadLines=async function(){
+  const purchaseId=Number($r('prPurchase')?.value),line=$r('prLine');if(!line)return;
+  if(!purchaseId){line.innerHTML='<option value="">اختر الفاتورة أولاً</option>';return}
+  line.innerHTML='<option value="">جارٍ تحميل الأصناف...</option>';
+  const {data,error}=await sb.rpc('sunshine_purchase_return_eligible_lines',{p_purchase_id:purchaseId});
+  if(error){line.innerHTML='<option value="">تعذر التحميل</option>';$r('prMsg').textContent='تعذر تحميل الأصناف: '+error.message;return}
+  line.innerHTML='<option value="">اختر الصنف</option>'+(data||[]).map(x=>`<option value="${x.purchase_item_id}" data-available="${x.available_quantity}" data-price="${x.unit_price}">${escR(x.item_name)} — متاح للمرتجع: ${fmtR(x.available_quantity)} — سعر: ${fmtR(x.unit_price)}</option>`).join('');
+ };
+ window.sunshinePurchaseReturnSubmit=async function(){
+  if(!sb)return;const purchase_item_id=Number($r('prLine').value),quantity=Number($r('prQty').value),reason=$r('prReason').value.trim();
+  if(!purchase_item_id||!(quantity>0)||!reason){$r('prMsg').textContent='اختر الصنف وأدخل كمية صحيحة وسبب المرتجع.';return}
+  const {error}=await sb.rpc('sunshine_create_purchase_return_request',{p_purchase_item_id:purchase_item_id,p_quantity:quantity,p_reason:reason});
+  if(error){$r('prMsg').textContent='تعذر إرسال الطلب: '+error.message;return}
+  $r('prMsg').textContent='تم إرسال الطلب للمدير. لم يتم تغيير المخزون حتى الآن.';$r('prQty').value='';$r('prReason').value='';await sunshinePurchaseReturnLoad();
+ };
+ window.sunshinePurchaseReturnApprove=async function(id){
+  if(role!=='admin'){alert('اعتماد المرتجع متاح للمدير فقط.');return}
+  if(!confirm('تأكيد اعتماد مرتجع المشتريات؟ سيتم خصم الكمية من المخزون وتخفيض إجمالي فاتورة الشراء وتحديث كشف المورد.'))return;
+  const {error}=await sb.rpc('sunshine_approve_purchase_return_request',{p_return_id:id});
+  if(error){alert('تعذر اعتماد المرتجع: '+error.message);return}
+  alert('تم اعتماد المرتجع وتحديث المخزون وفاتورة المشتريات وكشف المورد.');await sunshinePurchaseReturnLoad();
+  if(typeof purchaseLoad==='function')await purchaseLoad();
+ };
+ window.sunshinePurchaseReturnReject=async function(id){
+  if(role!=='admin')return;const reason=prompt('اكتب سبب رفض المرتجع:');if(reason===null)return;
+  const {error}=await sb.rpc('sunshine_reject_purchase_return_request',{p_return_id:id,p_rejection_reason:reason});
+  if(error){alert('تعذر رفض الطلب: '+error.message);return}await sunshinePurchaseReturnLoad();
+ };
+ window.openPage=function(id,btn){
+  if(id!=='purchase-returns')return priorOpen.call(this,id,btn);
+  if(!sb){alert('اتصال قاعدة البيانات غير متاح.');return}
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');
+  ['dashboard','items','shipments','sales','customers'].forEach(k=>document.getElementById(k)?.classList.add('hidden'));
+  const ph=document.getElementById('placeholder');ph.classList.remove('hidden');ph.classList.add('finance-page');
+  document.getElementById('pageTitle').textContent='مرتجعات المشتريات';ph.innerHTML=pageHtml();sunshinePurchaseReturnLoad();
+ };
+ document.addEventListener('DOMContentLoaded',()=>{const nav=document.getElementById('nav');if(nav&&!document.getElementById('sunshinePurchaseReturnsNav')){const b=document.createElement('button');b.id='sunshinePurchaseReturnsNav';b.type='button';b.innerHTML='<span>↩️</span><span>مرتجعات المشتريات</span>';b.onclick=function(){openPage('purchase-returns',this)};const purchase=[...nav.querySelectorAll('button')].find(x=>x.textContent.includes('المشتريات'));if(purchase)purchase.insertAdjacentElement('afterend',b);else nav.appendChild(b)}});
+})();
+</script>
 </body></html>

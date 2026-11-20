@@ -1680,12 +1680,16 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
   $('dashProfitNote').textContent=missing?'تنبيه: توجد فواتير قديمة بلا تكلفة شراء محفوظة؛ لم تُحتسب هذه السطور ضمن مجمل الربح. صافي الربح = مجمل الربح ناقص المصروفات المسجلة.':'تم احتساب مجمل الربح من تكلفة الأصناف المسجلة وقت البيع، ثم خصم المصروفات المسجلة للوصول إلى صافي الربح.';
  };
  async function reports(){
+  if(role!=='admin'){
+   page('التقارير',`<h3>تقرير المصروفات</h3><div class="finance-section"><h4>إضافة مصروف تشغيلي</h4><div class="finance-form"><div><label>تاريخ المصروف</label><input id="expenseDate" type="date" value="${todayR()}"></div><div><label>بند المصروف</label><input id="expenseCategory" placeholder="إيجار / نقل / ضيافة"></div><div><label>القيمة بالجنيه المصري</label><input id="expenseAmount" type="number" min="0.01" step="0.01"></div><div><label>البيان</label><input id="expenseDescription" placeholder="تفاصيل المصروف"></div></div><div class="finance-actions"><button type="button" onclick="sunshineAddExpense()">حفظ المصروف</button></div><p id="expenseMsg" class="msg"></p></div><div class="finance-section"><div class="finance-form"><div><label>من تاريخ</label><input id="rFrom" type="date" value="${new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().slice(0,10)}"></div><div><label>إلى تاريخ</label><input id="rTo" type="date" value="${todayR()}"></div></div><div class="finance-actions"><button type="button" onclick="sunshineRunReports()">عرض المصروفات</button></div><p id="rMsg" class="msg"></p></div><div id="rResults"></div>`);
+   await window.sunshineRunReports();
+   return;
+  }
   page('التقارير',`<h3>التقارير والإحصائيات</h3><div class="finance-section"><h4>تسجيل مصروف تشغيلي</h4><p class="muted">المصروفات المسجلة هنا تُخصم من مجمل الربح في صافي الربح. لا تُسجل تكلفة البضاعة أو مشتريات الأصناف كمصروف تشغيلي مرة ثانية.</p><div class="finance-form"><div><label>تاريخ المصروف</label><input id="expenseDate" type="date" value="${todayR()}"></div><div><label>بند المصروف</label><input id="expenseCategory" placeholder="إيجار / رواتب / كهرباء / نقل"></div><div><label>القيمة بالجنيه المصري</label><input id="expenseAmount" type="number" min="0.01" step="0.01"></div><div><label>البيان</label><input id="expenseDescription" placeholder="تفاصيل المصروف"></div></div><div class="finance-actions"><button type="button" onclick="sunshineAddExpense()">حفظ المصروف</button></div><p id="expenseMsg" class="msg"></p></div><div class="finance-section"><div class="finance-form"><div><label>من تاريخ</label><input id="rFrom" type="date" value="${new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().slice(0,10)}"></div><div><label>إلى تاريخ</label><input id="rTo" type="date" value="${todayR()}"></div></div><div class="finance-actions"><button onclick="sunshineRunReports()">عرض التقارير</button><button class="secondary" onclick="window.print()">طباعة التقرير</button></div><p id="rMsg" class="msg"></p></div><div id="rResults"></div>`);
   await window.sunshineRunReports();
  }
  window.sunshineAddExpense=async function(){
   const msg=$('expenseMsg'),btn=document.querySelector('button[onclick="sunshineAddExpense()"]');
-  if(role!=='admin'){if(msg)msg.textContent='إضافة المصروفات متاحة للمدير فقط.';return}
   if(!window.sb){if(msg)msg.textContent='الاتصال بقاعدة البيانات غير متاح. أعد تحميل البرنامج وحاول مرة أخرى.';return}
   const dateEl=$('expenseDate'),categoryEl=$('expenseCategory'),descriptionEl=$('expenseDescription'),amountEl=$('expenseAmount');
   const expense_date=dateEl?.value||todayR();
@@ -1737,6 +1741,14 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
  window.sunshineRunReports=async function(){
   const from=$('rFrom')?.value||'',to=$('rTo')?.value||'';if(from&&to&&from>to){$('rMsg').textContent='تاريخ البداية بعد تاريخ النهاية.';return}
   $('rMsg').textContent='جارٍ تحميل التقارير...';
+  if(role!=='admin'){
+   const {data:ee,error}=await sb.from('operating_expenses').select('id,expense_date,category,description,amount').gte('expense_date',from||'1900-01-01').lte('expense_date',to||'2999-12-31').order('expense_date',{ascending:false});
+   if(error){$('rMsg').textContent='تعذر تحميل تقرير المصروفات: '+error.message;return}
+   const rows=ee||[],total=rows.reduce((n,x)=>n+Number(x.amount||0),0);
+   $('rResults').innerHTML=`<div class="finance-stats"><div class="finance-stat"><b>عدد المصروفات</b><strong>${rows.length}</strong></div><div class="finance-stat"><b>إجمالي المصروفات</b><strong>${fmtR(total)} جنيه</strong></div></div><div class="finance-section"><h4>المصروفات المسجلة (${rows.length})</h4><div class="finance-table"><table><thead><tr><th>التاريخ</th><th>البند</th><th>البيان</th><th>القيمة</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${escR(x.expense_date)}</td><td>${escR(x.category)}</td><td>${escR(x.description||'')}</td><td>${fmtR(x.amount)} جنيه</td></tr>`).join('')||'<tr><td colspan="4">لا توجد مصروفات خلال الفترة.</td></tr>'}</tbody></table></div></div>`;
+   $('rMsg').textContent='تم تحميل تقرير المصروفات فقط.';
+   return;
+  }
   const [sales,purchases,items,shipments,expenses]=await Promise.all([
    sb.from('sales').select('id,invoice_number,invoice_date,total_amount,paid_amount,remaining_amount,currency,customer_id').gte('invoice_date',from||'1900-01-01').lte('invoice_date',to||'2999-12-31').order('invoice_date',{ascending:false}),
    sb.from('purchases').select('id,invoice_number,purchase_date,total_amount,paid_amount,remaining_amount,supplier_id').gte('purchase_date',from||'1900-01-01').lte('purchase_date',to||'2999-12-31').order('purchase_date',{ascending:false}),
@@ -1759,7 +1771,7 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
   $('rMsg').textContent='تم تحميل التقارير. الأرقام محسوبة من السجلات المتاحة في قاعدة البيانات.';
  };
  const oldOpen=window.openPage;
- window.openPage=function(id,btn){if((id==='reports'||id==='purchases')&&role!=='admin'){alert(id==='reports'?'التقارير متاحة للمدير فقط':'فواتير المشتريات متاحة للمدير فقط');return}if(id==='reports'){reports();return}return oldOpen.call(this,id,btn)};
+ window.openPage=function(id,btn){if(id==='purchases'&&role!=='admin'){alert('فواتير المشتريات متاحة للمدير فقط');return}if(id==='reports'){reports();return}return oldOpen.call(this,id,btn)};
  // Employee creation must be performed by a server-side Edge Function using the service-role key.
  const oldSettings=window.loadCompanySettings;
  window.loadCompanySettings=async function(){await oldSettings();if(role!=='admin')return;

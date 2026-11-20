@@ -2065,7 +2065,8 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
     return roots.some(root=>root&&[...root.querySelectorAll('input:not([readonly]),textarea,select')].some(el=>el.value&&el.value!==el.defaultValue&&el.type!=='date'));
   }
   async function refreshVisiblePage(){
-    if(refreshing||!window.sb||!role||!$rt('application')||$rt('application').classList.contains('hidden'))return;
+    if(refreshing){refreshQueued=true;return;}
+    if(!window.sb||!role||!$rt('application')||$rt('application').classList.contains('hidden'))return;
     const page=currentPage();
     // أرشيف الفواتير مستقل عن نموذج إنشاء الفاتورة؛ حدّثه حتى لو كان المؤشر داخل أحد حقول الفاتورة.
     if(userIsEditing()){
@@ -2114,18 +2115,23 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
       }
       if(role==='admin'&&window.loadCheckAlertBadge)await window.loadCheckAlertBadge();
     }catch(e){console.warn('Sunshine live refresh failed:',e)}
-    finally{refreshing=false}
+    finally{
+      refreshing=false;
+      // لا نفقد أي تغيير وصل أثناء تحميل البيانات؛ نفذ مزامنة لاحقة بعد انتهاء الطلب الحالي.
+      if(refreshQueued&&!document.hidden&&window.sb&&role&&!userIsEditing())queueRefresh(80);
+    }
   }
-  function queueRefresh(){
+  function queueRefresh(delay=80){
+    refreshQueued=true;
     if(refreshTimer)clearTimeout(refreshTimer);
-    refreshTimer=setTimeout(()=>{refreshTimer=null;refreshVisiblePage()},350);
+    refreshTimer=setTimeout(()=>{refreshTimer=null;refreshVisiblePage()},delay);
   }
   function startFallback(){
     if(fallbackTimer)clearInterval(fallbackTimer);
-    // شبكة احتياطية عند تعطيل Realtime أو عدم إدراج جدول في supabase_realtime.
+    // فحص احتياطي خفيف فقط؛ التحديث الأساسي يصل فورًا عبر Supabase Realtime.
     fallbackTimer=setInterval(()=>{
-      if(!document.hidden&&window.sb&&role&&Date.now()-lastRefreshAt>=9000)queueRefresh();
-    },10000);
+      if(!document.hidden&&window.sb&&role&&Date.now()-lastRefreshAt>=30000)queueRefresh(80);
+    },30000);
   }
   function startRealtime(){
     if(!window.sb||!role)return;
@@ -2150,7 +2156,7 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
     });
     startFallback();
   }
-  document.addEventListener('focusout',()=>{if(refreshQueued)setTimeout(queueRefresh,250)});
+  document.addEventListener('focusout',()=>{if(refreshQueued)setTimeout(()=>queueRefresh(80),80)});
   document.addEventListener('visibilitychange',()=>{
     if(!document.hidden&&window.sb&&role){if(Date.now()-lastRefreshAt>3000)queueRefresh();if(!realtimeChannel)startRealtime()}
   });
@@ -2176,30 +2182,18 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
 })();
 </script>
 <script>
-/* Sunshine ERP: dedicated live archive refresh */
+/* Sunshine ERP: sales archive follows the same low-latency Realtime stream (no 3-second polling). */
 (function(){
-  let timer = null;
-  let busy = false;
-  async function refreshArchive(){
-    const app = document.getElementById('application');
-    const archive = document.getElementById('salesArchive');
-    const title = document.getElementById('pageTitle');
-    if (document.hidden || !window.sb || typeof role === 'undefined' || !role || !app || app.classList.contains('hidden')) return;
-    if (!title || title.textContent.trim() !== 'المبيعات' || !archive || archive.classList.contains('hidden')) return;
-    if (busy || typeof window.loadSalesArchive !== 'function') return;
-    busy = true;
-    try { await window.loadSalesArchive(); }
-    catch (error) { console.warn('Archive refresh failed:', error); }
-    finally { busy = false; }
-  }
-  function start(){
-    if (timer) clearInterval(timer);
-    timer = setInterval(refreshArchive, 3000);
-  }
-  document.addEventListener('visibilitychange', function(){ if (!document.hidden) refreshArchive(); });
-  window.addEventListener('online', refreshArchive);
-  start();
-  window.sunshineRefreshInvoiceArchive = refreshArchive;
+  window.sunshineRefreshInvoiceArchive = async function(){
+    const app=document.getElementById('application');
+    const archive=document.getElementById('salesArchive');
+    const title=document.getElementById('pageTitle');
+    if(document.hidden||!window.sb||!role||!app||app.classList.contains('hidden'))return;
+    if(!title||title.textContent.trim()!=='المبيعات'||!archive||archive.classList.contains('hidden'))return;
+    if(typeof window.loadSalesArchive==='function'){
+      try{await window.loadSalesArchive()}catch(error){console.warn('Archive refresh failed:',error)}
+    }
+  };
 })();
 
 

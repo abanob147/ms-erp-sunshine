@@ -2058,10 +2058,13 @@ window.openPage=function(id,btn){if(id==='purchases'){if(typeof sb==='undefined'
     return map[title]||'dashboard';
   }
   function userIsEditing(){
+    const page=currentPage();
+    // تحديث قائمة العملاء لا يغيّر حقول نموذج إضافة/تعديل العميل؛ لذلك لا نوقفه
+    // لمجرد أن المؤشر داخل حقل في صفحة العملاء.
+    if(page==='customers')return false;
     const a=document.activeElement;
     if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))return true;
-    const page=currentPage();
-    const roots=page==='sales'?[$rt('invoicePrint')]:page==='items'?[$rt('items')]:page==='customers'?[$rt('customers')]:[$rt('placeholder')];
+    const roots=page==='sales'?[$rt('invoicePrint')]:page==='items'?[$rt('items')]:[$rt('placeholder')];
     return roots.some(root=>root&&[...root.querySelectorAll('input:not([readonly]),textarea,select')].some(el=>el.value&&el.value!==el.defaultValue&&el.type!=='date'));
   }
   async function refreshVisiblePage(){

@@ -772,7 +772,7 @@ async function saveInvoice(){
       if(!saved)throw lastError||new Error('تعذر حفظ الفاتورة بعد إعادة المحاولة');
       const repId=$('invoiceSalesRep')?.value||'';if(repId){const linked=await sb.rpc('sunshine_link_sale_to_rep',{p_invoice_number:invoiceNo,p_sales_rep_id:Number(repId)});if(linked.error)throw new Error('تم حفظ الفاتورة وخصم المخزون، لكن تعذر ترحيل مديونية المندوب. أعد ربط الفاتورة من المدير: '+linked.error.message)}
       pendingSaleRequestId=null;
-      msg('salesmsg','تم حفظ الفاتورة بنجاح وخصم المخزون. رقم الفاتورة: '+invoiceNo,true);
+      const salesMessage=$('salesmsg');if(salesMessage)salesMessage.textContent='';
     }
     if(autoPrintWindow&&!autoPrintWindow.closed){printInvoiceDocument(autoPrintWindow);autoPrintWindow=null;}
     else {msg('salesmsg','تم حفظ الفاتورة بنجاح، لكن لم تفتح نافذة الطباعة. اسمح بالنوافذ المنبثقة ثم أعد المحاولة.',true);}
@@ -2260,7 +2260,7 @@ function printInvoiceDocument(printWindow=null){
     if(live.tagName==='TEXTAREA')copy.textContent=live.value;
   });
   // لا نطبع حقل البيان اليدوي المخفي ولا نصه الإرشادي داخل الفاتورة.
-  clone.querySelectorAll('.no-print,button,.manual-product').forEach(el=>el.remove());
+  clone.querySelectorAll('.no-print,button,.manual-product,.sunshine-section-search,.sunshine-search-empty').forEach(el=>el.remove());
   clone.querySelectorAll('input,select,textarea').forEach(el=>{
     const span=document.createElement('span');
     span.className='print-field-value';
@@ -2447,6 +2447,8 @@ document.addEventListener('click',e=>{const b=e.target.closest('button[onclick*=
     if(!root || !root.querySelectorAll) return;
     root.querySelectorAll('table').forEach((table, index) => {
       if(table.dataset.sunshineSearchReady === '1') return;
+      // لا نضيف بحث الجداول داخل نموذج الفاتورة؛ حتى لا تظهر عناصر البحث في الفاتورة المطبوعة.
+      if(table.closest('#invoicePrint')) return;
       const body = table.tBodies && table.tBodies[0];
       if(!body || !table.tHead) return;
       // لا نضيف البحث لجداول إدخال الفواتير أو الجداول التي تحتوي حقول تحرير.

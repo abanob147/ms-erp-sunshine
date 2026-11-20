@@ -93,7 +93,7 @@ body button, body input, body select, body textarea, body label { font-weight: 6
 <div><label>العملة</label><select id="invCurrency"><option value="EGP">جنيه مصري</option></select></div>
 </div>
 <div class="scroll"><table id="invoiceTable"><thead><tr><th>الصنف / البيان</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th><th class="no-print">حذف</th></tr></thead><tbody id="invoiceRows"></tbody></table></div>
-<div class="invoice-actions no-print"><button type="button" onclick="addInvoiceRow()">إضافة صنف</button><button id="saveInvoiceBtn" type="button" onclick="saveInvoice()">حفظ الفاتورة</button><button id="cancelSaleEditBtn" type="button" class="secondary hidden" onclick="cancelSaleEdit()">إلغاء تعديل الفاتورة</button><button type="button" style="background:#168b55" onclick="sendInvoiceImageToPhone()">إرسال صورة الفاتورة للعميل</button><button type="button" style="background:#0b7285" onclick="sendInvoicePdfToPhone()">إرسال PDF للعميل</button><button type="button" style="background:#075e54" onclick="sendInvoicePdfToCompanyGroup()">إرسال PDF الفاتورة للجروب</button><button type="button" class="secondary" onclick="loadSalesArchive()">أرشيف الفواتير</button></div><p id="salesmsg" class="msg no-print"></p><div id="salesArchive" class="no-print hidden"><h3>أرشيف الفواتير</h3><div class="scroll"><table><thead><tr><th>رقم الفاتورة</th><th>اسم العميل</th><th>التاريخ</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>العملة</th><th>الإجراءات</th></tr></thead><tbody id="archiveRows"></tbody></table></div></div>
+<div class="invoice-actions no-print"><button type="button" onclick="addInvoiceRow()">إضافة صنف</button><button id="saveInvoiceBtn" type="button" onclick="saveInvoice()">حفظ الفاتورة</button><button id="cancelSaleEditBtn" type="button" class="secondary hidden" onclick="cancelSaleEdit()">إلغاء تعديل الفاتورة</button><button type="button" style="background:#168b55" onclick="sendInvoiceImageToPhone()">إرسال صورة الفاتورة للعميل</button><button type="button" style="background:#0b7285" onclick="sendInvoicePdfToPhone()">إرسال PDF للعميل</button><button type="button" style="background:#075e54" onclick="sendInvoicePdfToCompanyGroup()">إرسال PDF الفاتورة للجروب</button><button type="button" class="secondary" onclick="loadSalesArchive()">أرشيف الفواتير</button></div><p id="salesmsg" class="msg no-print"></p><div id="salesArchive" class="no-print hidden"><h3>أرشيف الفواتير</h3><div style="margin:10px 0"><label for="archiveCustomerSearch">بحث باسم صاحب الفاتورة</label><input id="archiveCustomerSearch" type="search" placeholder="اكتب اسم العميل للبحث في الأرشيف..." oninput="filterSalesArchive()" style="width:100%;max-width:420px"></div><p id="archiveSearchCount" class="muted" style="margin:4px 0 10px"></p><div class="scroll"><table><thead><tr><th>رقم الفاتورة</th><th>اسم العميل</th><th>التاريخ</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>العملة</th><th>الإجراءات</th></tr></thead><tbody id="archiveRows"></tbody></table></div></div>
 <div class="invoice-total"><div><b>الإجمالي</b><strong id="invGrand">0.00</strong></div><div><b>المدفوع</b><input id="invPaid" type="number" min="0" value="0" oninput="calcInvoice()" style="max-width:140px"></div><div><b>المتبقي</b><strong id="invDue">0.00</strong></div></div><div class="invoice-notes"><label for="invNotes">ملاحظات</label><textarea id="invNotes" rows="3" placeholder="اكتب أي ملاحظات خاصة بالفاتورة هنا..."></textarea></div><div style="margin-top:28px;border-top:1px solid #aaa;padding-top:10px;text-align:center;font-weight:800">شكرًا لتعاملكم معنا</div>
 </div><p class="muted no-print">راجع الأصناف والكميات والأسعار قبل الحفظ. الحفظ يخصم المخزون من قاعدة البيانات من خلال عملية واحدة.</p></div>
 <div id="returns" class="card hidden">
@@ -776,6 +776,20 @@ async function saveInvoice(){
   }catch(err){if(autoPrintWindow&&!autoPrintWindow.closed)autoPrintWindow.close();msg('salesmsg','لم يتم حفظ الفاتورة: '+(err.message||String(err))+' — لم يتم اعتماد خصم جزئي. يمكنك إعادة المحاولة بأمان.',false)}
   finally{if(button){button.disabled=false;button.textContent='حفظ الفاتورة'}}
 }
+let salesArchiveCache=[];
+function filterSalesArchive(){
+  const term=String($('archiveCustomerSearch')?.value||'').trim().toLocaleLowerCase('ar');
+  const filtered=salesArchiveCache.filter(x=>{
+    const name=String(x.customer_name||'غير محدد').toLocaleLowerCase('ar');
+    return !term||name.includes(term);
+  });
+  $('archiveRows').innerHTML=filtered.map(x=>{
+    const id=String(x.id).replace(/'/g,'');
+    const editBtn=role==='admin'?` <button type="button" onclick="editSaleInvoice('${id}')">تعديل الفاتورة</button> <button type="button" style="background:#a11" onclick="deleteArchivedSale('${id}')">مسح الفاتورة</button>`:'';
+    return `<tr><td>${esc(x.invoice_number)}</td><td>${esc(x.customer_name)}</td><td>${esc(x.invoice_date)}</td><td>${Number(x.total_amount||0).toLocaleString()}</td><td>${Number(x.paid_amount||0).toLocaleString()}</td><td>${Number(x.remaining_amount||0).toLocaleString()}</td><td>${esc(x.currency)}</td><td><button type="button" class="secondary" onclick="showSaleDetails('${id}')">عرض</button> <button type="button" onclick="printArchivedSale('${id}')">PDF</button> <button type="button" style="background:#168b55" onclick="sendArchivedSaleImageToPhone('${id}')">إرسال صورة للعميل</button> <button type="button" style="background:#0b7285" onclick="sendArchivedSalePdfToPhone('${id}')">إرسال PDF للعميل</button> <button type="button" style="background:#075e54" onclick="sendArchivedSalePdfToCompanyGroup('${id}')">إرسال PDF للجروب</button>${editBtn}</td></tr>`;
+  }).join('')||'<tr><td colspan="8">لا توجد فواتير مطابقة للبحث.</td></tr>';
+  if($('archiveSearchCount'))$('archiveSearchCount').textContent='عدد الفواتير المعروضة: '+filtered.length+' من '+salesArchiveCache.length;
+}
 async function loadSalesArchive(){
   if(!sb)return;
   $('salesArchive').classList.remove('hidden');
@@ -783,7 +797,8 @@ async function loadSalesArchive(){
   const {data,error}=await sb.from('sales').select('id,invoice_number,customer_id,invoice_date,total_amount,paid_amount,remaining_amount,currency').order('invoice_date',{ascending:false}).limit(100);
   if(error){$('archiveRows').innerHTML='<tr><td colspan="8">تعذر تحميل الأرشيف: '+esc(error.message)+'</td></tr>';return}
   const customerNames=new Map(customersCache.map(c=>[String(c.id),c.name]));
-  $('archiveRows').innerHTML=(data||[]).map(x=>{const id=String(x.id).replace(/'/g,'');const editBtn=role==='admin'?` <button type="button" onclick="editSaleInvoice('${id}')">تعديل الفاتورة</button> <button type="button" style="background:#a11" onclick="deleteArchivedSale('${id}')">مسح الفاتورة</button>`:'';return `<tr><td>${esc(x.invoice_number)}</td><td>${esc(customerNames.get(String(x.customer_id))||'غير محدد')}</td><td>${esc(x.invoice_date)}</td><td>${Number(x.total_amount||0).toLocaleString()}</td><td>${Number(x.paid_amount||0).toLocaleString()}</td><td>${Number(x.remaining_amount||0).toLocaleString()}</td><td>${esc(x.currency)}</td><td><button type="button" class="secondary" onclick="showSaleDetails('${id}')">عرض</button> <button type="button" onclick="printArchivedSale('${id}')">PDF</button> <button type="button" style="background:#168b55" onclick="sendArchivedSaleImageToPhone('${id}')">إرسال صورة للعميل</button> <button type="button" style="background:#0b7285" onclick="sendArchivedSalePdfToPhone('${id}')">إرسال PDF للعميل</button> <button type="button" style="background:#075e54" onclick="sendArchivedSalePdfToCompanyGroup('${id}')">إرسال PDF للجروب</button>${editBtn}</td></tr>`}).join('')||'<tr><td colspan="8">لا توجد فواتير محفوظة.</td></tr>';
+  salesArchiveCache=(data||[]).map(x=>({...x,customer_name:customerNames.get(String(x.customer_id))||'غير محدد'}));
+  filterSalesArchive();
 }
 async function deleteArchivedSale(id){
   if(role!=='admin'){alert('مسح الفواتير متاح للمدير فقط.');return;}
